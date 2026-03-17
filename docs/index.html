@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Orion CLI</title>
+    <meta
+      name="description"
+      content="OpenAPI-first CLI for humans and AI agents. Discover, describe, call APIs, and generate curl from operation IDs."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #08131f;
+        --panel: #102439;
+        --panel-2: #17314a;
+        --text: #ecf4fb;
+        --muted: #9ab3c9;
+        --line: #2c4a67;
+        --accent: #f7b34d;
+        --accent-2: #6dd5b0;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(1000px 500px at 80% -10%, #1f405f 0%, transparent 60%),
+          radial-gradient(900px 500px at -10% 100%, #12384f 0%, transparent 60%),
+          var(--bg);
+      }
+      .wrap { width: min(1000px, 92vw); margin: 0 auto; }
+      header { padding: 3.5rem 0 2.5rem; }
+      .badge {
+        display: inline-block;
+        padding: .35rem .7rem;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        font-size: .78rem;
+        letter-spacing: .05em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      h1 {
+        font-size: clamp(2rem, 6vw, 3.7rem);
+        line-height: 1.02;
+        margin: .8rem 0 .7rem;
+      }
+      .lead {
+        max-width: 58ch;
+        color: var(--muted);
+        font-size: 1.06rem;
+      }
+      .cta { display: flex; gap: .8rem; flex-wrap: wrap; margin-top: 1.5rem; }
+      a.btn {
+        text-decoration: none;
+        color: #08131f;
+        background: var(--accent);
+        font-weight: 700;
+        padding: .78rem 1rem;
+        border-radius: .65rem;
+      }
+      a.btn.secondary {
+        color: var(--text);
+        background: transparent;
+        border: 1px solid var(--line);
+      }
+      main { padding-bottom: 3rem; }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1rem;
+      }
+      .card {
+        background: linear-gradient(165deg, var(--panel-2), var(--panel));
+        border: 1px solid var(--line);
+        border-radius: .95rem;
+        padding: 1rem 1.1rem;
+      }
+      h2 { margin: 0 0 .8rem; font-size: 1.1rem; }
+      p, li { color: var(--muted); }
+      code, pre {
+        font-family: "IBM Plex Mono", "Menlo", monospace;
+      }
+      pre {
+        margin: 0;
+        padding: .8rem;
+        border-radius: .7rem;
+        border: 1px solid #2e4a67;
+        background: #0b1f32;
+        overflow: auto;
+        color: #dff1ff;
+        font-size: .9rem;
+      }
+      ul { margin: .4rem 0 0 1rem; padding: 0; }
+      footer {
+        padding: 1.8rem 0 2.2rem;
+        color: var(--muted);
+        border-top: 1px solid var(--line);
+        margin-top: 1.4rem;
+      }
+      footer a { color: var(--accent-2); text-decoration: none; }
+      @media (max-width: 800px) {
+        .grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <span class="badge">Orion CLI</span>
+        <h1>OpenAPI-first CLI for humans and AI agents</h1>
+        <p class="lead">
+          Discover endpoints, inspect request and response details, execute operations,
+          and generate ready-to-run curl commands from operation IDs.
+        </p>
+        <div class="cta">
+          <a class="btn" href="https://github.com/michalwiacek/orion-cli">View on GitHub</a>
+          <a class="btn secondary" href="https://github.com/michalwiacek/orion-cli#readme">Read Docs</a>
+        </div>
+      </header>
+
+      <main>
+        <section class="grid">
+          <article class="card">
+            <h2>Install</h2>
+            <pre><code>zig build install --prefix ~/.local</code></pre>
+          </article>
+
+          <article class="card">
+            <h2>Build &amp; Test</h2>
+            <pre><code>zig build
+zig test src/openapi_loader_integration_test.zig</code></pre>
+          </article>
+
+          <article class="card">
+            <h2>Quickstart</h2>
+            <pre><code>orion list
+orion describe get:/health
+orion call get:/health
+orion curl get:/health -k --pretty</code></pre>
+          </article>
+
+          <article class="card">
+            <h2>Config</h2>
+            <p>Layered config: project overrides global.</p>
+            <ul>
+              <li><code>~/.config/orion/config.json</code></li>
+              <li><code>.orion/config.json</code></li>
+            </ul>
+          </article>
+        </section>
+      </main>
+
+      <footer>
+        Orion CLI is open source under MIT.
+        Links:
+        <a href="https://github.com/michalwiacek/orion-cli">Repository</a>,
+        <a href="https://github.com/michalwiacek/orion-cli/blob/main/CHANGELOG.md">Changelog</a>,
+        <a href="https://github.com/michalwiacek/orion-cli/blob/main/RELEASE_CHECKLIST.md">Release checklist</a>.
+      </footer>
+    </div>
+  </body>
+</html>
