@@ -1,170 +1,781 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Orion CLI</title>
-    <meta
-      name="description"
-      content="OpenAPI-first CLI for humans and AI agents. Discover, describe, call APIs, and generate curl from operation IDs."
-    />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
-    <style>
-      :root {
-        --bg: #08131f;
-        --panel: #102439;
-        --panel-2: #17314a;
-        --text: #ecf4fb;
-        --muted: #9ab3c9;
-        --line: #2c4a67;
-        --accent: #f7b34d;
-        --accent-2: #6dd5b0;
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Orion CLI — OpenAPI-first CLI for humans and AI agents</title>
+  <meta name="description"
+    content="Discover endpoints, inspect schemas, call APIs, and generate curl from operation IDs. Orion CLI is an OpenAPI-first command line tool for humans and AI agents." />
+  <meta property="og:title" content="Orion CLI" />
+  <meta property="og:description"
+    content="OpenAPI-first CLI for humans and AI agents. Discover, describe, call APIs, and generate curl from operation IDs." />
+  <meta property="og:type" content="website" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg: #07111b;
+      --bg-soft: #0b1724;
+      --panel: rgba(16, 36, 57, 0.92);
+      --panel-2: rgba(20, 49, 74, 0.95);
+      --panel-3: rgba(10, 24, 38, 0.92);
+      --text: #ecf4fb;
+      --muted: #9bb4ca;
+      --muted-2: #bfd2e2;
+      --line: #2a4966;
+      --line-2: #355c80;
+      --accent: #f7b34d;
+      --accent-2: #6dd5b0;
+      --shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+      --radius: 20px;
+      --radius-sm: 14px;
+      --max: 1140px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(900px 540px at 82% -10%, rgba(44, 93, 136, 0.40) 0%, transparent 62%),
+        radial-gradient(760px 500px at -8% 100%, rgba(26, 89, 120, 0.34) 0%, transparent 60%),
+        linear-gradient(180deg, #07111b 0%, #08131f 100%);
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .wrap {
+      width: min(var(--max), 92vw);
+      margin: 0 auto;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      padding: 1.2rem 0 0;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: .75rem;
+      font-weight: 700;
+      letter-spacing: .02em;
+    }
+
+    .brand-mark {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      box-shadow: 0 0 24px rgba(247, 179, 77, 0.35);
+    }
+
+    .mini-nav {
+      display: flex;
+      gap: .7rem;
+      flex-wrap: wrap;
+    }
+
+    .mini-nav a {
+      text-decoration: none;
+      color: var(--muted);
+      border: 1px solid transparent;
+      border-radius: 999px;
+      padding: .48rem .78rem;
+      transition: .18s ease;
+    }
+
+    .mini-nav a:hover {
+      color: var(--text);
+      border-color: var(--line);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    header {
+      padding: 3.2rem 0 2rem;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.08fr .92fr;
+      gap: 1.35rem;
+      align-items: stretch;
+    }
+
+    .hero-copy,
+    .hero-demo {
+      min-width: 0;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .55rem;
+      padding: .42rem .78rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: .78rem;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .badge-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--accent-2);
+      box-shadow: 0 0 10px rgba(109, 213, 176, 0.5);
+    }
+
+    h1 {
+      font-size: clamp(2.35rem, 6vw, 4.65rem);
+      line-height: 0.98;
+      margin: 1rem 0 .9rem;
+      letter-spacing: -0.04em;
+      max-width: 11ch;
+    }
+
+    .lead {
+      max-width: 60ch;
+      color: var(--muted-2);
+      font-size: 1.08rem;
+      line-height: 1.65;
+      margin: 0 0 1.15rem;
+    }
+
+    .subpoints {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .7rem;
+      margin: 0 0 1.5rem;
+      padding: 0;
+      list-style: none;
+    }
+
+    .subpoints li {
+      color: var(--text);
+      font-size: .95rem;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 999px;
+      padding: .55rem .8rem;
+    }
+
+    .cta {
+      display: flex;
+      gap: .8rem;
+      flex-wrap: wrap;
+      margin-top: 1.35rem;
+    }
+
+    .btn {
+      text-decoration: none;
+      font-weight: 700;
+      padding: .92rem 1.1rem;
+      border-radius: .9rem;
+      transition: transform .14s ease, border-color .14s ease, background .14s ease;
+      will-change: transform;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+    }
+
+    .btn.primary {
+      color: #08131f;
+      background: linear-gradient(135deg, #ffc66f, var(--accent));
+      box-shadow: 0 10px 28px rgba(247, 179, 77, 0.22);
+    }
+
+    .btn.secondary {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--line);
+    }
+
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-top: 1.15rem;
+      color: var(--muted);
+      font-size: .94rem;
+    }
+
+    .terminal {
+      background: linear-gradient(180deg, rgba(8, 18, 29, 0.98), rgba(8, 24, 38, 0.96));
+      border: 1px solid var(--line-2);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      min-height: 100%;
+    }
+
+    .terminal-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: .85rem 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .terminal-dots {
+      display: flex;
+      gap: .45rem;
+    }
+
+    .terminal-dots span {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+
+    .terminal-dots span:nth-child(1) {
+      background: #ff6d6d;
+    }
+
+    .terminal-dots span:nth-child(2) {
+      background: #f7c95b;
+    }
+
+    .terminal-dots span:nth-child(3) {
+      background: #64d59e;
+    }
+
+    .terminal-title {
+      color: var(--muted);
+      font-size: .86rem;
+      white-space: nowrap;
+    }
+
+    .terminal pre,
+    pre {
+      margin: 0;
+      font-family: "IBM Plex Mono", "Menlo", monospace;
+    }
+
+    .terminal pre {
+      padding: 1.15rem 1.1rem 1.2rem;
+      overflow: auto;
+      color: #dff1ff;
+      font-size: .92rem;
+      line-height: 1.62;
+    }
+
+    .prompt {
+      color: var(--accent);
+    }
+
+    .muted {
+      color: #8fb0c8;
+    }
+
+    .green {
+      color: #7de7b8;
+    }
+
+    .blue {
+      color: #90d5ff;
+    }
+
+    main {
+      padding: 1rem 0 4rem;
+    }
+
+    section {
+      margin-top: 1.15rem;
+    }
+
+    .section-head {
+      margin-bottom: 1rem;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-size: .78rem;
+      margin-bottom: .55rem;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: clamp(1.45rem, 3vw, 2.1rem);
+      letter-spacing: -0.03em;
+    }
+
+    .section-copy {
+      color: var(--muted);
+      max-width: 70ch;
+      line-height: 1.7;
+      margin-top: .55rem;
+    }
+
+    .grid-3,
+    .grid-2 {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .grid-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .grid-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .card {
+      background: linear-gradient(165deg, var(--panel-2), var(--panel));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.15rem 1.15rem 1.2rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+    }
+
+    .card h3 {
+      margin: 0 0 .55rem;
+      font-size: 1.08rem;
+    }
+
+    .card p,
+    .card li {
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    .kicker {
+      display: inline-block;
+      font-size: .75rem;
+      color: var(--accent-2);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      margin-bottom: .6rem;
+    }
+
+    .callout {
+      background:
+        linear-gradient(180deg, rgba(15, 34, 52, 0.96), rgba(10, 22, 34, 0.96));
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 1.2rem;
+      box-shadow: var(--shadow);
+    }
+
+    .callout-grid {
+      display: grid;
+      grid-template-columns: .9fr 1.1fr;
+      gap: 1rem;
+      align-items: start;
+    }
+
+    pre.code {
+      padding: .95rem 1rem;
+      border-radius: 14px;
+      border: 1px solid #2e4a67;
+      background: #0b1f32;
+      overflow: auto;
+      color: #dff1ff;
+      font-size: .9rem;
+      line-height: 1.55;
+    }
+
+    .steps {
+      margin: .3rem 0 0;
+      padding-left: 1.15rem;
+    }
+
+    .steps li+li {
+      margin-top: .4rem;
+    }
+
+    .tiny-note {
+      color: var(--muted);
+      font-size: .92rem;
+      margin-top: .7rem;
+    }
+
+    .install-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .inline-links {
+      display: flex;
+      gap: .8rem;
+      flex-wrap: wrap;
+      margin-top: .9rem;
+    }
+
+    .inline-links a {
+      color: var(--accent-2);
+      text-decoration: none;
+    }
+
+    .inline-links a:hover {
+      text-decoration: underline;
+    }
+
+    footer {
+      padding: 2rem 0 2.5rem;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      margin-top: 2.2rem;
+    }
+
+    footer a {
+      color: var(--accent-2);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    .footer-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    @media (max-width: 980px) {
+
+      .hero,
+      .callout-grid,
+      .install-grid,
+      .grid-3,
+      .grid-2 {
+        grid-template-columns: 1fr;
       }
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        font-family: "Space Grotesk", "Trebuchet MS", sans-serif;
-        color: var(--text);
-        background:
-          radial-gradient(1000px 500px at 80% -10%, #1f405f 0%, transparent 60%),
-          radial-gradient(900px 500px at -10% 100%, #12384f 0%, transparent 60%),
-          var(--bg);
-      }
-      .wrap { width: min(1000px, 92vw); margin: 0 auto; }
-      header { padding: 3.5rem 0 2.5rem; }
-      .badge {
-        display: inline-block;
-        padding: .35rem .7rem;
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        font-size: .78rem;
-        letter-spacing: .05em;
-        text-transform: uppercase;
-        color: var(--accent);
-      }
+
       h1 {
-        font-size: clamp(2rem, 6vw, 3.7rem);
-        line-height: 1.02;
-        margin: .8rem 0 .7rem;
+        max-width: none;
       }
-      .lead {
-        max-width: 58ch;
-        color: var(--muted);
-        font-size: 1.06rem;
-      }
-      .cta { display: flex; gap: .8rem; flex-wrap: wrap; margin-top: 1.5rem; }
-      a.btn {
-        text-decoration: none;
-        color: #08131f;
-        background: var(--accent);
-        font-weight: 700;
-        padding: .78rem 1rem;
-        border-radius: .65rem;
-      }
-      a.btn.secondary {
-        color: var(--text);
-        background: transparent;
-        border: 1px solid var(--line);
-      }
-      main { padding-bottom: 3rem; }
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 1rem;
-      }
-      .card {
-        background: linear-gradient(165deg, var(--panel-2), var(--panel));
-        border: 1px solid var(--line);
-        border-radius: .95rem;
-        padding: 1rem 1.1rem;
-      }
-      h2 { margin: 0 0 .8rem; font-size: 1.1rem; }
-      p, li { color: var(--muted); }
-      code, pre {
-        font-family: "IBM Plex Mono", "Menlo", monospace;
-      }
-      pre {
-        margin: 0;
-        padding: .8rem;
-        border-radius: .7rem;
-        border: 1px solid #2e4a67;
-        background: #0b1f32;
-        overflow: auto;
-        color: #dff1ff;
-        font-size: .9rem;
-      }
-      ul { margin: .4rem 0 0 1rem; padding: 0; }
-      footer {
-        padding: 1.8rem 0 2.2rem;
-        color: var(--muted);
-        border-top: 1px solid var(--line);
-        margin-top: 1.4rem;
-      }
-      footer a { color: var(--accent-2); text-decoration: none; }
-      @media (max-width: 800px) {
-        .grid { grid-template-columns: 1fr; }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="wrap">
-      <header>
-        <span class="badge">Orion CLI</span>
-        <h1>OpenAPI-first CLI for humans and AI agents</h1>
-        <p class="lead">
-          Discover endpoints, inspect request and response details, execute operations,
-          and generate ready-to-run curl commands from operation IDs.
-        </p>
-        <div class="cta">
-          <a class="btn" href="https://github.com/michalwiacek/orion-cli">View on GitHub</a>
-          <a class="btn secondary" href="https://github.com/michalwiacek/orion-cli#readme">Read Docs</a>
-        </div>
-      </header>
+    }
 
-      <main>
-        <section class="grid">
-          <article class="card">
-            <h2>Install</h2>
-            <pre><code>zig build install --prefix ~/.local</code></pre>
-          </article>
+    @media (max-width: 680px) {
+      .topbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
 
-          <article class="card">
-            <h2>Build &amp; Test</h2>
-            <pre><code>zig build
-zig test src/openapi_loader_integration_test.zig</code></pre>
-          </article>
+      header {
+        padding-top: 2rem;
+      }
 
-          <article class="card">
-            <h2>Quickstart</h2>
-            <pre><code>orion list
-orion describe get:/health
-orion call get:/health
-orion curl get:/health -k --pretty</code></pre>
-          </article>
+      .btn {
+        width: 100%;
+        text-align: center;
+      }
 
-          <article class="card">
-            <h2>Config</h2>
-            <p>Layered config: project overrides global.</p>
-            <ul>
-              <li><code>~/.config/orion/config.json</code></li>
-              <li><code>.orion/config.json</code></li>
-            </ul>
-          </article>
-        </section>
-      </main>
+      .cta {
+        flex-direction: column;
+      }
 
-      <footer>
-        Orion CLI is open source under MIT.
-        Links:
-        <a href="https://github.com/michalwiacek/orion-cli">Repository</a>,
-        <a href="https://github.com/michalwiacek/orion-cli/blob/main/CHANGELOG.md">Changelog</a>,
-        <a href="https://github.com/michalwiacek/orion-cli/blob/main/RELEASE_CHECKLIST.md">Release checklist</a>.
-      </footer>
+      .hero-meta {
+        flex-direction: column;
+        gap: .45rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>Orion CLI</span>
+      </div>
+
+      <nav class="mini-nav" aria-label="Primary">
+        <a href="#why">Why Orion</a>
+        <a href="#demo">Demo</a>
+        <a href="#quickstart">Quickstart</a>
+        <a href="#install">Install</a>
+      </nav>
     </div>
-  </body>
+
+    <header>
+      <section class="hero">
+        <div class="hero-copy">
+          <span class="badge">
+            <span class="badge-dot" aria-hidden="true"></span>
+            OpenAPI-first CLI
+          </span>
+
+          <h1>Call APIs by operation ID, not by guesswork.</h1>
+
+          <p class="lead">
+            Orion CLI helps humans and AI agents discover endpoints, inspect request and
+            response shapes, execute operations, and generate ready-to-run curl commands
+            directly from OpenAPI specs.
+          </p>
+
+          <ul class="subpoints" aria-label="Highlights">
+            <li>Discover endpoints fast</li>
+            <li>Inspect schemas without digging through YAML</li>
+            <li>Generate curl instantly</li>
+          </ul>
+
+          <div class="cta">
+            <a class="btn primary" href="https://github.com/michalwiacek/orion-cli">View on GitHub</a>
+            <a class="btn secondary" href="https://github.com/michalwiacek/orion-cli#readme">Read Docs</a>
+          </div>
+
+          <div class="hero-meta">
+            <span>Open source under MIT</span>
+            <span>Built for local API exploration</span>
+            <span>Human-friendly and agent-friendly</span>
+          </div>
+        </div>
+
+        <div class="hero-demo" id="demo">
+          <div class="terminal">
+            <div class="terminal-bar">
+              <div class="terminal-dots" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </div>
+              <div class="terminal-title">terminal — orion describe post:/auth/login</div>
+            </div>
+            <pre><code><span class="prompt">$</span> orion describe post:/auth/login
+
+<span class="blue">Operation</span>  post:/auth/login
+<span class="blue">Summary</span>    Authenticate a user and return an access token
+
+<span class="blue">Headers</span>
+  Content-Type: application/json
+
+<span class="blue">Request body</span>
+  email: string <span class="muted">(required)</span>
+  password: string <span class="muted">(required)</span>
+
+<span class="blue">Responses</span>
+  200  AuthTokenResponse
+  401  Unauthorized
+  422  ValidationError
+
+<span class="prompt">$</span> orion curl post:/auth/login -k --pretty
+<span class="green">✓</span> Generated ready-to-run curl command</code></pre>
+          </div>
+        </div>
+      </section>
+    </header>
+
+    <main>
+      <section id="why">
+        <div class="section-head">
+          <span class="eyebrow">Why Orion</span>
+          <h2>Made for the real work between docs and requests.</h2>
+          <p class="section-copy">
+            Orion sits in the gap between raw OpenAPI files and manual API poking.
+            Instead of hunting through specs, stitching requests by hand, or jumping
+            between tools, you work from the operation itself.
+          </p>
+        </div>
+
+        <div class="grid-3">
+          <article class="card">
+            <span class="kicker">Operation-first</span>
+            <h3>Use stable operation targets</h3>
+            <p>
+              Work directly with operation IDs and endpoint operations instead of manually
+              reconstructing paths, payloads, and headers every time.
+            </p>
+          </article>
+
+          <article class="card">
+            <span class="kicker">OpenAPI-aware</span>
+            <h3>Inspect request and response shapes fast</h3>
+            <p>
+              See parameters, bodies, and responses without digging through YAML,
+              chasing <code>$ref</code>s, or reverse-engineering docs.
+            </p>
+          </article>
+
+          <article class="card">
+            <span class="kicker">Curl-ready</span>
+            <h3>Move from inspection to execution instantly</h3>
+            <p>
+              Generate ready-to-run curl commands for debugging, sharing examples,
+              reproducing issues, and automating API workflows.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <div class="callout">
+          <div class="callout-grid">
+            <div>
+              <span class="eyebrow">Why not just curl, Postman, or raw OpenAPI?</span>
+              <h2>Because the painful part is mapping intent to the right request.</h2>
+              <p class="section-copy" style="margin-top:.7rem;">
+                Curl is great once you already know the endpoint shape. Postman is useful once
+                someone has assembled the request. Raw OpenAPI is the source of truth, but not the
+                fastest interface for exploration. Orion turns the spec into a usable CLI surface.
+              </p>
+            </div>
+
+            <div class="card" style="padding: 1rem;">
+              <h3 style="margin-top:0;">What Orion helps with</h3>
+              <ul class="steps">
+                <li>Find the right operation quickly</li>
+                <li>Understand expected input and output before calling it</li>
+                <li>Generate a correct request from the spec</li>
+                <li>Give AI agents a predictable interface over API definitions</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="quickstart">
+        <div class="section-head">
+          <span class="eyebrow">Quickstart</span>
+          <h2>From discovery to request in a few commands.</h2>
+        </div>
+
+        <div class="grid-2">
+          <article class="card">
+            <h3>Explore the API</h3>
+            <pre class="code"><code>orion list
+orion describe get:/health
+orion describe post:/auth/login</code></pre>
+            <p class="tiny-note">
+              Start by discovering available operations and inspecting what each one expects.
+            </p>
+          </article>
+
+          <article class="card">
+            <h3>Call or export the request</h3>
+            <pre class="code"><code>orion call get:/health
+orion call post:/auth/login
+orion curl post:/auth/login -k --pretty</code></pre>
+            <p class="tiny-note">
+              Execute operations directly or generate curl commands you can share, tweak, or automate.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="install">
+        <div class="section-head">
+          <span class="eyebrow">Install &amp; Build</span>
+          <h2>Simple setup for local-first API work.</h2>
+        </div>
+
+        <div class="install-grid">
+          <article class="card">
+            <h3>Install</h3>
+            <pre class="code"><code>zig build install --prefix ~/.local</code></pre>
+            <p class="tiny-note">
+              Add Orion to your local toolchain and start exploring APIs from OpenAPI specs.
+            </p>
+          </article>
+
+          <article class="card">
+            <h3>Build &amp; test</h3>
+            <pre class="code"><code>zig build
+zig test src/openapi_loader_integration_test.zig</code></pre>
+            <p class="tiny-note">
+              Useful if you want to hack on the project, validate changes, or contribute.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <div class="grid-2">
+          <article class="card">
+            <h3>Config</h3>
+            <p>Layered configuration lets project settings override global defaults.</p>
+            <pre class="code"><code>~/.config/orion/config.json
+.orion/config.json</code></pre>
+          </article>
+
+          <article class="card">
+            <h3>Current sweet spot</h3>
+            <p>
+              Orion is especially useful for local API exploration, debugging, internal tooling,
+              CLI-based workflows, and agent-friendly access to OpenAPI-described systems.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section>
+        <div class="callout">
+          <div class="callout-grid">
+            <div>
+              <span class="eyebrow">Open source</span>
+              <h2>Built in the open. Ready to test, inspect, and improve.</h2>
+              <p class="section-copy" style="margin-top:.7rem;">
+                If the idea clicks with you, star the repo, try it on a real API spec,
+                and break it in interesting ways. That is the fastest path to making it better.
+              </p>
+            </div>
+
+            <div>
+              <div class="cta" style="margin-top:0;">
+                <a class="btn primary" href="https://github.com/michalwiacek/orion-cli">Star on GitHub</a>
+                <a class="btn secondary" href="https://github.com/michalwiacek/orion-cli/blob/main/CHANGELOG.md">See
+                  Changelog</a>
+              </div>
+
+              <div class="inline-links">
+                <a href="https://github.com/michalwiacek/orion-cli#readme">Documentation</a>
+                <a href="https://github.com/michalwiacek/orion-cli/blob/main/RELEASE_CHECKLIST.md">Release checklist</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="footer-row">
+        <div>
+          Orion CLI is open source under MIT.
+        </div>
+        <div>
+          <a href="https://github.com/michalwiacek/orion-cli">Repository</a>
+          ·
+          <a href="https://github.com/michalwiacek/orion-cli/blob/main/CHANGELOG.md">Changelog</a>
+          ·
+          <a href="https://github.com/michalwiacek/orion-cli/blob/main/RELEASE_CHECKLIST.md">Release checklist</a>
+        </div>
+      </div>
+    </footer>
+  </div>
+</body>
+
 </html>
