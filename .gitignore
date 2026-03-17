@@ -1,0 +1,15 @@
+.DS_Store
+.zig-cache/
+zig-out/
+docs/private/
+
+# Local config and temp files
+.orion/
+.env
+.env.*
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+*.log

@@ -1,0 +1,1348 @@
+openapi: 3.0.3
+info:
+  title: GunArena API
+  version: 0.1.0
+  description: |
+    Aktualny kontrakt API dla scope bez flow zakupu.
+    Auth działa przez cookie `auth_token` lub `Authorization: Bearer <jwt>`.
+servers:
+  - url: http://localhost:3333
+tags:
+  - name: System
+  - name: Auth
+  - name: Categories
+  - name: Discovery
+  - name: Marketplace
+  - name: Loadouts
+  - name: Media
+  - name: Audit
+  - name: Progression
+paths:
+  /health:
+    get:
+      tags: [System]
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                required: [status]
+  /swagger/openapi.yaml:
+    get:
+      tags: [System]
+      summary: Raw OpenAPI specification
+      responses:
+        '200':
+          description: OpenAPI YAML
+          content:
+            application/yaml:
+              schema:
+                type: string
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register actor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Actor created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Actor'
+        '400':
+          $ref: '#/components/responses/Error400'
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout user
+      description: Clears auth_token cookie on server side.
+      responses:
+        '200':
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login actor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Logged in (sets auth_token cookie)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                required: [status]
+        '401':
+          $ref: '#/components/responses/Error401'
+  /api/v1/categories:
+    get:
+      tags: [Categories]
+      summary: List categories
+      parameters:
+        - $ref: '#/components/parameters/CategoriesIsActiveQuery'
+      responses:
+        '200':
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '500':
+          $ref: '#/components/responses/Error500'
+  /api/v1/listings:
+    get:
+      tags: [Discovery]
+      summary: List discovery listings
+      responses:
+        '200':
+          description: Listing projection
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Listing'
+        '500':
+          $ref: '#/components/responses/Error500'
+  /api/v1/offers:
+    get:
+      tags: [Marketplace]
+      summary: List published offers
+      parameters:
+        - $ref: '#/components/parameters/OffersLimitQuery'
+        - $ref: '#/components/parameters/OffersOffsetQuery'
+        - $ref: '#/components/parameters/OffersQQuery'
+        - $ref: '#/components/parameters/OffersCategoryQuery'
+        - $ref: '#/components/parameters/OffersCaliberQuery'
+        - $ref: '#/components/parameters/OffersConditionQuery'
+        - $ref: '#/components/parameters/OffersShippingQuery'
+        - $ref: '#/components/parameters/OffersLocationQuery'
+        - $ref: '#/components/parameters/OffersMinPriceQuery'
+        - $ref: '#/components/parameters/OffersMaxPriceQuery'
+        - $ref: '#/components/parameters/OffersSortQuery'
+      responses:
+        '200':
+          description: Offers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Offer'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '500':
+          $ref: '#/components/responses/Error500'
+  /api/v1/offers/priority:
+    get:
+      tags: [Marketplace]
+      summary: List priority (sponsored) offers
+      parameters:
+        - $ref: '#/components/parameters/OffersLimitQuery'
+      responses:
+        '200':
+          description: Priority offers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Offer'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '500':
+          $ref: '#/components/responses/Error500'
+  /api/v1/offers/{id}:
+    get:
+      tags: [Marketplace]
+      summary: Offer details
+      parameters:
+        - $ref: '#/components/parameters/UUIDPathID'
+      responses:
+        '200':
+          description: Offer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Offer'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '404':
+          $ref: '#/components/responses/Error404'
+  /api/v1/offers/{id}/status:
+    patch:
+      tags: [Marketplace]
+      summary: Moderate offer status
+      description: "Allowed actor types: ADMIN, MODERATOR. Used to approve pending offers (PENDING -> PUBLISHED) or reject/close (-> CLOSED)."
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPathID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModerateOfferStatusRequest'
+      responses:
+        '200':
+          description: Updated offer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Offer'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+  /api/v1/offers/create:
+    post:
+      tags: [Marketplace]
+      summary: Create offer
+      description: "Allowed actor types: USER, SHOP. Newly created offers are PENDING until approved by ADMIN/MODERATOR."
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOfferRequest'
+      responses:
+        '201':
+          description: Offer created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Offer'
+        '429':
+          description: Too many active offers for actor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+  /api/v1/offers/create-from-item:
+    post:
+      tags: [Marketplace]
+      summary: Create offer from existing item
+      description: "Alias for /api/v1/offers/create. Allowed actor types: USER, SHOP. Newly created offers are PENDING until approved by ADMIN/MODERATOR."
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOfferRequest'
+      responses:
+        '201':
+          description: Offer created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Offer'
+        '429':
+          description: Too many active offers for actor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+  /api/v1/loadouts:
+    get:
+      tags: [Loadouts]
+      summary: My loadouts
+      description: "Allowed actor types: USER, SHOP."
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: My loadouts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Loadout'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '500':
+          $ref: '#/components/responses/Error500'
+    post:
+      tags: [Loadouts]
+      summary: Create loadout
+      description: "Allowed actor types: USER, SHOP."
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertLoadoutRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Loadout'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+  /api/v1/loadouts/{id}:
+    get:
+      tags: [Loadouts]
+      summary: Public loadout details
+      parameters:
+        - $ref: '#/components/parameters/UUIDPathID'
+      responses:
+        '200':
+          description: Public loadout
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Loadout'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+    put:
+      tags: [Loadouts]
+      summary: Update my loadout
+      description: "Allowed actor types: USER, SHOP."
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPathID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertLoadoutRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Loadout'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+  /api/v1/loadouts/{id}/weight:
+    get:
+      tags: [Loadouts]
+      summary: Get loadout total weight
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPathID'
+      responses:
+        '200':
+          description: Total weight
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalWeight:
+                    type: number
+                    format: double
+                required: [totalWeight]
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '500':
+          $ref: '#/components/responses/Error500'
+  /api/v1/upload:
+    post:
+      tags: [Media]
+      summary: Upload image
+      description: Multipart upload, max 5MB, requires auth.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required: [file]
+      responses:
+        '201':
+          description: Uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  path:
+                    type: string
+                    example: uploads/abc.webp
+                required: [path]
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '413':
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/Error500'
+  /api/v1/audit-logs:
+    get:
+      tags: [Audit]
+      summary: List audit logs
+      description: "Allowed actor types: ADMIN, MODERATOR."
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/ActorIDQuery'
+        - $ref: '#/components/parameters/EntityTypeQuery'
+        - $ref: '#/components/parameters/EntityIDQuery'
+        - $ref: '#/components/parameters/ActionQuery'
+      responses:
+        '200':
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditLog'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '500':
+          $ref: '#/components/responses/Error500'
+  /api/v1/audit-logs/{id}:
+    get:
+      tags: [Audit]
+      summary: Get audit log details
+      description: "Allowed actor types: ADMIN, MODERATOR."
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UUIDPathID'
+      responses:
+        '200':
+          description: Audit log
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLog'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '403':
+          $ref: '#/components/responses/Error403'
+        '404':
+          $ref: '#/components/responses/Error404'
+        '500':
+          $ref: '#/components/responses/Error500'
+  /api/v1/me/progression:
+    get:
+      tags: [Progression]
+      summary: Get my progression snapshot
+      description: Returns XP, level and wallet snapshot for authenticated actor.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Progression snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Progression'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '500':
+          $ref: '#/components/responses/Error500'
+  /api/v1/me/settings:
+    get:
+      tags: [Settings]
+      summary: Get my settings
+      description: Returns the authenticated actor settings document stored in jsonb.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Settings document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSettings'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '500':
+          $ref: '#/components/responses/Error500'
+  /api/v1/me/settings/profile:
+    patch:
+      tags: [Settings]
+      summary: Patch profile settings
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileSettingsPatch'
+      responses:
+        '200':
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSettings'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+  /api/v1/me/settings/appearance:
+    patch:
+      tags: [Settings]
+      summary: Patch appearance settings
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppearanceSettingsPatch'
+      responses:
+        '200':
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSettings'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+  /api/v1/me/settings/locale:
+    patch:
+      tags: [Settings]
+      summary: Patch locale settings
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocaleSettingsPatch'
+      responses:
+        '200':
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSettings'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+  /api/v1/me/settings/privacy:
+    patch:
+      tags: [Settings]
+      summary: Patch privacy settings
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrivacySettingsPatch'
+      responses:
+        '200':
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSettings'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+  /api/v1/me/settings/notifications:
+    patch:
+      tags: [Settings]
+      summary: Patch notification settings
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationSettingsPatch'
+      responses:
+        '200':
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSettings'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+  /api/v1/me/settings/marketplace:
+    patch:
+      tags: [Settings]
+      summary: Patch marketplace settings
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarketplaceSettingsPatch'
+      responses:
+        '200':
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSettings'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: auth_token
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    UUIDPathID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    LimitQuery:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    ActorIDQuery:
+      name: actorId
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+    EntityTypeQuery:
+      name: entityType
+      in: query
+      required: false
+      schema:
+        type: string
+    EntityIDQuery:
+      name: entityId
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+    ActionQuery:
+      name: action
+      in: query
+      required: false
+      schema:
+        type: string
+    OffersLimitQuery:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+    OffersOffsetQuery:
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    OffersQQuery:
+      name: q
+      in: query
+      required: false
+      schema:
+        type: string
+    OffersCategoryQuery:
+      name: category
+      in: query
+      required: false
+      description: Multi-category filter. Supports repeated params (`category=handguns&category=rifles`) and CSV in each value (`category=handguns,rifles`). Selecting a parent category includes all descendant categories.
+      schema:
+        type: array
+        items:
+          type: string
+      style: form
+      explode: true
+    OffersCaliberQuery:
+      name: caliber
+      in: query
+      required: false
+      description: Optional caliber filter. Supports repeated params and CSV (`caliber=9x19&caliber=5.56` or `caliber=9x19,5.56`).
+      schema:
+        type: array
+        items:
+          type: string
+      style: form
+      explode: true
+    OffersConditionQuery:
+      name: condition
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [new, used]
+    OffersShippingQuery:
+      name: shipping
+      in: query
+      required: false
+      schema:
+        type: boolean
+    OffersLocationQuery:
+      name: location
+      in: query
+      required: false
+      schema:
+        type: string
+    OffersMinPriceQuery:
+      name: minPrice
+      in: query
+      required: false
+      schema:
+        type: number
+        format: double
+        minimum: 0
+    OffersMaxPriceQuery:
+      name: maxPrice
+      in: query
+      required: false
+      schema:
+        type: number
+        format: double
+        minimum: 0
+    OffersSortQuery:
+      name: sort
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [newest, price_asc, price_desc]
+        default: newest
+    CategoriesIsActiveQuery:
+      name: isActive
+      in: query
+      required: false
+      schema:
+        type: boolean
+        default: true
+  responses:
+    Error400:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Error401:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Error403:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Error404:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Error500:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+      required: [status]
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    RegisterRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required: [email, password]
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required: [email, password]
+    Actor:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        actorType:
+          type: string
+          enum: [USER, SHOP, AD_PARTNER, ADMIN, MODERATOR]
+        isVerified:
+          type: boolean
+      required: [id, email, actorType, isVerified]
+    Listing:
+      type: object
+      properties:
+        offerId:
+          type: string
+        assetId:
+          type: string
+        sellerId:
+          type: string
+        askingPrice:
+          type: number
+          format: double
+        status:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [offerId, assetId, sellerId, askingPrice, status, publishedAt, updatedAt]
+    Offer:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        assetId:
+          type: string
+          format: uuid
+        sellerId:
+          type: string
+          format: uuid
+        askingPrice:
+          type: number
+          format: double
+        status:
+          type: string
+          enum: [PENDING, PUBLISHED, CLOSED]
+        isPriority:
+          type: boolean
+        categoryId:
+          type: string
+        title:
+          type: string
+        brand:
+          type: string
+        model:
+          type: string
+        description:
+          type: string
+        condition:
+          type: string
+          enum: [new, used]
+        location:
+          type: string
+        shipping:
+          type: boolean
+        specs:
+          type: object
+          description: "Category-specific structured specs (e.g. `{ \"caliber\": \"9x19\" }` for firearms)."
+          additionalProperties: true
+        weight:
+          type: number
+          format: double
+        imageUrls:
+          type: array
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, assetId, sellerId, askingPrice, status, isPriority, categoryId, title, brand, model, condition, shipping, createdAt]
+    Item:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        actorId:
+          type: string
+          format: uuid
+        categoryId:
+          type: string
+        brand:
+          type: string
+        model:
+          type: string
+        weight:
+          type: number
+          format: double
+        pricePaid:
+          type: number
+          format: double
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, actorId, categoryId, brand, model, weight, pricePaid, createdAt]
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        weight:
+          type: integer
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+        iconName:
+          type: string
+        isActive:
+          type: boolean
+        isFeatured:
+          type: boolean
+        metadataSchema:
+          type: object
+          additionalProperties: true
+        colorAccent:
+          type: string
+          nullable: true
+        accessLevel:
+          type: object
+          additionalProperties: true
+        seoTitle:
+          type: string
+          nullable: true
+        seoDescription:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        [id, name, slug, weight, iconName, isActive, isFeatured, metadataSchema, accessLevel, createdAt, updatedAt]
+    Loadout:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        actorId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        isPublic:
+          type: boolean
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Item'
+        totalWeight:
+          type: number
+          format: double
+        type:
+          type: string
+      required: [id, actorId, title, isPublic, items, totalWeight]
+    UpsertLoadoutRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        itemIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        isPublic:
+          type: boolean
+      required: [title, itemIds, isPublic]
+    CreateOfferRequest:
+      type: object
+      properties:
+        assetId:
+          type: string
+          format: uuid
+          nullable: true
+        itemId:
+          type: string
+          format: uuid
+          nullable: true
+        categoryId:
+          type: string
+        title:
+          type: string
+        brand:
+          type: string
+        model:
+          type: string
+        description:
+          type: string
+        condition:
+          type: string
+          enum: [new, used]
+        location:
+          type: string
+        shipping:
+          type: boolean
+        specs:
+          type: object
+          additionalProperties: true
+        price:
+          type: number
+          format: double
+        imagePaths:
+          type: array
+          description: Uploaded image paths returned by `POST /api/v1/upload`.
+          items:
+            type: string
+        tags:
+          type: array
+          items:
+            type: string
+      required: [categoryId, title, brand, model, condition, shipping, price]
+    ModerateOfferStatusRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [PUBLISHED, CLOSED]
+      required: [status]
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        actorId:
+          type: string
+          format: uuid
+        action:
+          type: string
+        entityType:
+          type: string
+        entityId:
+          type: string
+          format: uuid
+        metadata:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, actorId, action, entityType, entityId, metadata, createdAt]
+    Progression:
+      type: object
+      properties:
+        actorId:
+          type: string
+          format: uuid
+        xpTotal:
+          type: integer
+          format: int64
+        level:
+          type: integer
+        xpToNextLevel:
+          type: integer
+          format: int64
+        walletBalance:
+          type: integer
+          format: int64
+        updatedAt:
+          type: string
+          format: date-time
+      required: [actorId, xpTotal, level, xpToNextLevel, walletBalance]
+    ProfileSettings:
+      type: object
+      properties:
+        displayName:
+          type: string
+        callsign:
+          type: string
+      required: [displayName, callsign]
+    AppearanceSettings:
+      type: object
+      properties:
+        theme:
+          type: string
+          enum: [noir, police, synthwave, pink, uwu]
+      required: [theme]
+    LocaleSettings:
+      type: object
+      properties:
+        language:
+          type: string
+          enum: [pl, en]
+        timezone:
+          type: string
+      required: [language, timezone]
+    PrivacySettings:
+      type: object
+      properties:
+        profileVisibility:
+          type: string
+          enum: [public, private]
+        loadoutVisibility:
+          type: string
+          enum: [public, private]
+        activityVisibility:
+          type: string
+          enum: [public, private]
+      required: [profileVisibility, loadoutVisibility, activityVisibility]
+    NotificationSettings:
+      type: object
+      properties:
+        email:
+          type: boolean
+        push:
+          type: boolean
+        marketing:
+          type: boolean
+        offers:
+          type: boolean
+        messages:
+          type: boolean
+      required: [email, push, marketing, offers, messages]
+    MarketplaceSettings:
+      type: object
+      properties:
+        defaultSort:
+          type: string
+          enum: [newest, price_asc, price_desc]
+        showPriorityFirst:
+          type: boolean
+        showOnlyShippable:
+          type: boolean
+      required: [defaultSort, showPriorityFirst, showOnlyShippable]
+    UserSettings:
+      type: object
+      properties:
+        version:
+          type: integer
+        profile:
+          $ref: '#/components/schemas/ProfileSettings'
+        appearance:
+          $ref: '#/components/schemas/AppearanceSettings'
+        locale:
+          $ref: '#/components/schemas/LocaleSettings'
+        privacy:
+          $ref: '#/components/schemas/PrivacySettings'
+        notifications:
+          $ref: '#/components/schemas/NotificationSettings'
+        marketplace:
+          $ref: '#/components/schemas/MarketplaceSettings'
+        updatedAt:
+          type: string
+          format: date-time
+      required: [version, profile, appearance, locale, privacy, notifications, marketplace, updatedAt]
+    ProfileSettingsPatch:
+      type: object
+      properties:
+        displayName:
+          type: string
+        callsign:
+          type: string
+    AppearanceSettingsPatch:
+      type: object
+      properties:
+        theme:
+          type: string
+          enum: [noir, police, synthwave, pink, uwu]
+    LocaleSettingsPatch:
+      type: object
+      properties:
+        language:
+          type: string
+          enum: [pl, en]
+        timezone:
+          type: string
+    PrivacySettingsPatch:
+      type: object
+      properties:
+        profileVisibility:
+          type: string
+          enum: [public, private]
+        loadoutVisibility:
+          type: string
+          enum: [public, private]
+        activityVisibility:
+          type: string
+          enum: [public, private]
+    NotificationSettingsPatch:
+      type: object
+      properties:
+        email:
+          type: boolean
+        push:
+          type: boolean
+        marketing:
+          type: boolean
+        offers:
+          type: boolean
+        messages:
+          type: boolean
+    MarketplaceSettingsPatch:
+      type: object
+      properties:
+        defaultSort:
+          type: string
+          enum: [newest, price_asc, price_desc]
+        showPriorityFirst:
+          type: boolean
+        showOnlyShippable:
+          type: boolean
