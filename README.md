@@ -56,6 +56,18 @@ orion describe <operation-id>
 orion call <operation-id|url-or-path>
 orion curl <operation-id|url-or-path>
 orion config
+orion doctor
+orion history
+orion rerun <history-id>
+orion profile list
+orion use <profile>
+orion current
+orion search <query>
+orion example <operation-id>
+orion explain <operation-id>
+orion cache refresh
+orion plan "<goal>"
+orion plugin list
 
 ## Structure
 
@@ -114,10 +126,30 @@ Supported flags for `call`:
 - `--query key=value` to append query params
 - `--body @file.json|json` for request body (JSON)
 - `--method METHOD` for direct URL/path mode (default `GET`)
+- `--dry-run` to render the resolved request without sending it
+- `--explain` to print request resolution details (target, URL, body source)
+- `--use NAME` / `--save NAME` for reusable request presets in `.orion/presets/`
+- `--no-auto-body` to disable schema-based automatic body generation
+- `--no-body-cache` to disable reading/writing remembered request bodies
+- `--show-body-source` to print where body came from (explicit/cache/generated)
+- `--output text|json` for script-friendly output
+- `--example` to generate and use request body example from schema
 
 `orion curl` supports the same flags and prints an equivalent `curl` command.
 It also passes native curl flags (for example `-k`, `--insecure`) and supports explicit `--curl-flag FLAG`.
-Use `--pretty` for multiline output and `--` to pass remaining args directly to curl.
+Use `--pretty` for multiline output, `--output text|json` for machine-readable output, and `--` to pass remaining args directly to curl.
+
+Additional workflow commands:
+- `orion doctor [--output text|json]` validates config and OpenAPI loading health.
+- `orion history [--limit N] [--output text|json]` shows recent successful calls.
+- `orion rerun <history-id> [--dry-run] [--output text|json]` replays a historical request.
+- `orion search <query>` finds operations with fuzzy scoring.
+- `orion example <operation-id> [--mode minimal|full] [--format json|yaml]` generates payload examples.
+- `orion explain <operation-id>` gives workflow-oriented explanation.
+- `orion cache refresh` + `orion list --offline` enables offline browsing of operation cache.
+- `orion profile add/list/remove`, `orion use`, `orion current` provide context switching.
+- HTTP shortcuts are available: `orion get /health`, `orion post /auth/login`, etc.
+- AI-native hooks: `orion describe <operation-id> --for-agent`, `orion plan "<goal>"`.
 
 ## OpenAPI parsing (MVP)
 

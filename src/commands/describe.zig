@@ -2,7 +2,43 @@ const std = @import("std");
 const loader = @import("../openapi/loader.zig");
 
 pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
-    if (args.len < 1) {
+    var output_json = false;
+    var for_agent = false;
+    var operation_id: ?[]const u8 = null;
+
+    var i: usize = 0;
+    while (i < args.len) : (i += 1) {
+        const arg = args[i];
+        if (std.mem.eql(u8, arg, "--output")) {
+            if (i + 1 >= args.len) {
+                std.debug.print("Usage: orion describe <operation-id> [--output text|json]\n", .{});
+                return;
+            }
+            i += 1;
+            if (std.mem.eql(u8, args[i], "json")) {
+                output_json = true;
+            } else if (std.mem.eql(u8, args[i], "text")) {
+                output_json = false;
+            } else {
+                std.debug.print("Invalid output mode. Use --output text|json\n", .{});
+                return;
+            }
+            continue;
+        }
+        if (std.mem.eql(u8, arg, "--for-agent")) {
+            for_agent = true;
+            output_json = true;
+            continue;
+        }
+        if (operation_id == null) {
+            operation_id = arg;
+            continue;
+        }
+        std.debug.print("Usage: orion describe <operation-id> [--output text|json]\n", .{});
+        return;
+    }
+
+    if (operation_id == null) {
         std.debug.print("Usage: orion describe <operation-id>\n", .{});
         std.debug.print("Example: orion describe get:/health\n", .{});
         return;
@@ -17,13 +53,39 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
     };
     defer allocator.free(spec_path);
 
-    const wanted = args[0];
-    var details = (try loader.loadOperationDetailsFromFile(allocator, spec_path, wanted)) orelse {
+    const wanted = operation_id.?;
+    var details = (loader.loadOperationDetailsFromFile(allocator, spec_path, wanted) catch |err| {
+        printDescribeError(spec_path, err);
+        return;
+    }) orelse {
         std.debug.print("Operation not found: {s}\n", .{wanted});
+        if (trySuggestOperationId(allocator, spec_path, wanted)) |hint| {
+            defer allocator.free(hint);
+            std.debug.print("Did you mean: {s}\n", .{hint});
+        }
         std.debug.print("Use `orion list` to inspect available ids.\n", .{});
         return;
     };
     defer details.deinit(allocator);
+
+    if (output_json) {
+        if (for_agent) {
+            const payload = struct {
+                operation: loader.OperationDetails,
+                hints: []const []const u8,
+            }{
+                .operation = details,
+                .hints = &.{
+                    "Use request_body_fields to construct payloads.",
+                    "Prefer operation id over raw URL for reproducibility.",
+                },
+            };
+            std.debug.print("{f}\n", .{std.json.fmt(payload, .{})});
+        } else {
+            std.debug.print("{f}\n", .{std.json.fmt(details, .{})});
+        }
+        return;
+    }
 
     std.debug.print("Operation  {s}\n", .{details.id});
     if (details.summary) |summary| {
@@ -56,6 +118,32 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
             std.debug.print("  {s}\n", .{resp});
         }
     }
+}
+
+fn trySuggestOperationId(allocator: std.mem.Allocator, spec_path: []const u8, wanted: []const u8) ?[]u8 {
+    var operations = loader.loadOperationsFromFile(allocator, spec_path) catch return null;
+    defer operations.deinit(allocator);
+
+    var best_score: usize = 0;
+    var best: ?[]u8 = null;
+    errdefer if (best) |v| allocator.free(v);
+
+    for (operations.items) |op| {
+        var score: usize = 0;
+        if (std.mem.indexOf(u8, op.id, wanted) != null) score += 20;
+        if (std.mem.indexOf(u8, op.path, wanted) != null) score += 10;
+        if (score > best_score) {
+            if (best) |old| allocator.free(old);
+            best_score = score;
+            best = allocator.dupe(u8, op.id) catch null;
+        }
+    }
+
+    if (best_score == 0) {
+        if (best) |v| allocator.free(v);
+        return null;
+    }
+    return best;
 }
 
 fn printParameterGroup(parameters: []const []u8, location: []const u8) void {
@@ -122,5 +210,14 @@ fn printRequestBody(details: loader.OperationDetails) void {
         for (details.request_body_schemas) |schema| {
             std.debug.print("    - {s}\n", .{schema});
         }
+    }
+}
+
+fn printDescribeError(spec_path: []const u8, err: anyerror) void {
+    switch (err) {
+        error.FileNotFound => std.debug.print("OpenAPI spec not found: {s}\n", .{spec_path}),
+        error.AccessDenied => std.debug.print("Cannot read OpenAPI spec (permission denied): {s}\n", .{spec_path}),
+        error.InvalidOpenApiDocument => std.debug.print("Invalid OpenAPI document: {s}\n", .{spec_path}),
+        else => std.debug.print("Failed to describe operation from spec ({s}): {s}\n", .{ spec_path, @errorName(err) }),
     }
 }

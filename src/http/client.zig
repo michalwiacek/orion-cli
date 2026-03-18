@@ -39,7 +39,13 @@ pub fn request(
         defer allocator.free(mutable_body);
         try req.sendBodyComplete(mutable_body);
     } else {
-        try req.sendBodiless();
+        if (method.requestHasBody()) {
+            const empty = try allocator.alloc(u8, 0);
+            defer allocator.free(empty);
+            try req.sendBodyComplete(empty);
+        } else {
+            try req.sendBodiless();
+        }
     }
 
     var response = try req.receiveHead(&.{});

@@ -35,7 +35,12 @@ pub fn resolveSpecPath(allocator: std.mem.Allocator) ![]u8 {
     defer loaded_cfg.deinit(allocator);
 
     if (loaded_cfg.config.openapi_spec) |spec| {
-        return allocator.dupe(u8, spec);
+        return resolveConfiguredSpecPath(
+            allocator,
+            spec,
+            loaded_cfg.project_path,
+            loaded_cfg.global_path,
+        );
     }
 
     if (fileExists("openapi.remote.yaml")) {
@@ -46,6 +51,39 @@ pub fn resolveSpecPath(allocator: std.mem.Allocator) ![]u8 {
     }
 
     return error.SpecPathNotConfigured;
+}
+
+fn resolveConfiguredSpecPath(
+    allocator: std.mem.Allocator,
+    spec: []const u8,
+    project_config_path: ?[]const u8,
+    global_config_path: []const u8,
+) ![]u8 {
+    if (isHttpUrl(spec) or std.fs.path.isAbsolute(spec)) {
+        return allocator.dupe(u8, spec);
+    }
+
+    if (project_config_path) |project_cfg| {
+        const project_root = std.fs.path.dirname(std.fs.path.dirname(project_cfg) orelse "") orelse "";
+        if (project_root.len > 0) {
+            const candidate = try std.fs.path.join(allocator, &.{ project_root, spec });
+            if (pathExists(candidate)) return candidate;
+            allocator.free(candidate);
+        }
+    }
+
+    if (pathExists(spec)) {
+        return allocator.dupe(u8, spec);
+    }
+
+    const global_dir = std.fs.path.dirname(global_config_path) orelse "";
+    if (global_dir.len > 0) {
+        const candidate = try std.fs.path.join(allocator, &.{ global_dir, spec });
+        if (pathExists(candidate)) return candidate;
+        allocator.free(candidate);
+    }
+
+    return allocator.dupe(u8, spec);
 }
 
 pub fn loadOperationsFromFile(
@@ -1025,6 +1063,15 @@ fn fileExists(path: []const u8) bool {
     const file = std.fs.cwd().openFile(path, .{}) catch return false;
     file.close();
     return true;
+}
+
+fn pathExists(path: []const u8) bool {
+    if (std.fs.path.isAbsolute(path)) {
+        const file = std.fs.openFileAbsolute(path, .{}) catch return false;
+        file.close();
+        return true;
+    }
+    return fileExists(path);
 }
 
 fn freeStringSlice(allocator: std.mem.Allocator, values: [][]u8) void {

@@ -2,11 +2,16 @@ const std = @import("std");
 const app_config = @import("../config/config.zig");
 const loader = @import("../openapi/loader.zig");
 
+const OutputMode = enum {
+    text,
+    json,
+};
+
 pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
     if (args.len < 1) {
         std.debug.print(
             \\Usage:
-            \\  orion curl <operation-id|url-or-path> [--param key=value] [--query key=value] [--body @file.json|json] [--method METHOD] [-k] [--curl-flag FLAG] [--pretty] [-- ...]
+            \\  orion curl <operation-id|url-or-path> [--param key=value] [--query key=value] [--body @file.json|json] [--method METHOD] [-k] [--curl-flag FLAG] [--pretty] [--output text|json] [-- ...]
             \\
             \\Examples:
             \\  orion curl get:/health
@@ -31,6 +36,12 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
     defer loaded_cfg.deinit(allocator);
 
     const resolved_target = resolveTarget(allocator, target, loaded_cfg.config.base_url, parsed) catch |err| {
+        if (err == error.OperationNotFound) {
+            if (trySuggestOperationId(allocator, target)) |hint| {
+                defer allocator.free(hint);
+                std.debug.print("Did you mean: {s}\n", .{hint});
+            }
+        }
         printCurlError(err);
         return;
     };
@@ -85,14 +96,51 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
         try renderSingleLine(allocator, tokens.items);
     defer allocator.free(rendered);
 
-    std.debug.print("[ok] Generated ready-to-run curl command\n", .{});
-    std.debug.print("{s}\n", .{rendered});
+    if (parsed.output == .json) {
+        const payload = struct {
+            command: []const u8,
+        }{ .command = rendered };
+        std.debug.print("{f}\n", .{std.json.fmt(payload, .{})});
+    } else {
+        std.debug.print("[ok] Generated ready-to-run curl command\n", .{});
+        std.debug.print("{s}\n", .{rendered});
+    }
+}
+
+fn trySuggestOperationId(allocator: std.mem.Allocator, wanted: []const u8) ?[]u8 {
+    const spec_path = loader.resolveSpecPath(allocator) catch return null;
+    defer allocator.free(spec_path);
+
+    var operations = loader.loadOperationsFromFile(allocator, spec_path) catch return null;
+    defer operations.deinit(allocator);
+
+    var best_score: usize = 0;
+    var best: ?[]u8 = null;
+    errdefer if (best) |v| allocator.free(v);
+
+    for (operations.items) |op| {
+        var score: usize = 0;
+        if (std.mem.indexOf(u8, op.id, wanted) != null) score += 20;
+        if (std.mem.indexOf(u8, op.path, wanted) != null) score += 10;
+        if (score > best_score) {
+            if (best) |old| allocator.free(old);
+            best_score = score;
+            best = allocator.dupe(u8, op.id) catch null;
+        }
+    }
+
+    if (best_score == 0) {
+        if (best) |v| allocator.free(v);
+        return null;
+    }
+    return best;
 }
 
 const CallArgs = struct {
     method_override: ?[]const u8 = null,
     body: ?[]const u8 = null,
     pretty: bool = false,
+    output: OutputMode = .text,
     path_params: []KeyValue,
     query_params: []KeyValue,
     curl_flags: [][]u8,
@@ -145,6 +193,7 @@ fn parseCallArgs(allocator: std.mem.Allocator, args: []const []const u8) !CallAr
     var method_override: ?[]const u8 = null;
     var body: ?[]const u8 = null;
     var pretty = false;
+    var output: OutputMode = .text;
     var passthrough_mode = false;
 
     var i: usize = 0;
@@ -194,6 +243,18 @@ fn parseCallArgs(allocator: std.mem.Allocator, args: []const []const u8) !CallAr
             pretty = true;
             continue;
         }
+        if (std.mem.eql(u8, arg, "--output")) {
+            if (i + 1 >= args.len) return error.MissingOutputMode;
+            i += 1;
+            if (std.mem.eql(u8, args[i], "json")) {
+                output = .json;
+            } else if (std.mem.eql(u8, args[i], "text")) {
+                output = .text;
+            } else {
+                return error.InvalidOutputMode;
+            }
+            continue;
+        }
         if (arg.len > 0 and arg[0] == '-') {
             // Pass through native curl flags such as -k/--insecure.
             try curl_flags.append(allocator, try allocator.dupe(u8, arg));
@@ -206,6 +267,7 @@ fn parseCallArgs(allocator: std.mem.Allocator, args: []const []const u8) !CallAr
         .method_override = method_override,
         .body = body,
         .pretty = pretty,
+        .output = output,
         .path_params = try path_params.toOwnedSlice(allocator),
         .query_params = try query_params.toOwnedSlice(allocator),
         .curl_flags = try curl_flags.toOwnedSlice(allocator),
@@ -471,7 +533,9 @@ fn printCurlError(err: anyerror) void {
         error.OperationNotFound => std.debug.print("Operation not found in current OpenAPI spec.\n", .{}),
         error.MissingPathParam => std.debug.print("Missing required path parameter. Pass it with --param key=value.\n", .{}),
         error.InvalidKeyValue => std.debug.print("Invalid key=value format. Example: --query limit=10\n", .{}),
-        error.UnknownFlag => std.debug.print("Unknown curl flag. Supported: --param --query --body --method --curl-flag --pretty and native curl flags like -k (or use -- passthrough)\n", .{}),
+        error.UnknownFlag => std.debug.print("Unknown curl flag. Supported: --param --query --body --method --curl-flag --pretty --output and native curl flags like -k (or use -- passthrough)\n", .{}),
+        error.MissingOutputMode => std.debug.print("Missing output mode. Use --output text|json.\n", .{}),
+        error.InvalidOutputMode => std.debug.print("Invalid output mode. Use --output text|json.\n", .{}),
         error.MethodDoesNotSupportBody => std.debug.print("HTTP method does not support request body.\n", .{}),
         else => std.debug.print("Curl generation failed: {s}\n", .{@errorName(err)}),
     }
