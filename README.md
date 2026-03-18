@@ -33,13 +33,13 @@ See:
 ## Install locally
 
 ```bash
-zig build install --prefix ~/.local
+./setup.sh
 ```
 
-Binary path:
+Manual alternative:
 
 ```bash
-~/.local/bin/orion
+zig build install --prefix ~/.local
 ```
 
 ## Goals
