@@ -380,3 +380,72 @@ test "operations include multiple methods for same path" {
     try testing.expect(found_get);
     try testing.expect(found_post);
 }
+
+test "describe extracts request body field lines" {
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    const spec =
+        \\{
+        \\  "openapi": "3.0.3",
+        \\  "paths": {
+        \\    "/auth/login": {
+        \\      "post": {
+        \\        "requestBody": {
+        \\          "required": true,
+        \\          "content": {
+        \\            "application/json": {
+        \\              "schema": {
+        \\                "type": "object",
+        \\                "properties": {
+        \\                  "email": { "type": "string" },
+        \\                  "password": { "type": "string" }
+        \\                },
+        \\                "required": ["email", "password"]
+        \\              }
+        \\            }
+        \\          }
+        \\        },
+        \\        "responses": { "200": { "description": "ok" } }
+        \\      }
+        \\    }
+        \\  }
+        \\}
+    ;
+
+    const path = try writeSpec(&tmp, testing.allocator, "fields.json", spec);
+    defer testing.allocator.free(path);
+
+    var details = (try loader.loadOperationDetailsFromFile(testing.allocator, path, "post:/auth/login")) orelse return error.TestExpectedEqual;
+    defer details.deinit(testing.allocator);
+
+    try testing.expect(details.request_body_fields.len == 2);
+    try testing.expect(std.mem.indexOf(u8, details.request_body_fields[0], "email: string (required)") != null or std.mem.indexOf(u8, details.request_body_fields[1], "email: string (required)") != null);
+    try testing.expect(std.mem.indexOf(u8, details.request_body_fields[0], "password: string (required)") != null or std.mem.indexOf(u8, details.request_body_fields[1], "password: string (required)") != null);
+}
+
+test "loads default server url from OpenAPI servers array" {
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    const spec =
+        \\openapi: 3.0.3
+        \\servers:
+        \\  - url: http://localhost:3333
+        \\paths:
+        \\  /health:
+        \\    get:
+        \\      responses:
+        \\        '200':
+        \\          description: ok
+    ;
+
+    const path = try writeSpec(&tmp, testing.allocator, "servers.yaml", spec);
+    defer testing.allocator.free(path);
+
+    const maybe_server = try loader.loadDefaultServerUrlFromFile(testing.allocator, path);
+    defer if (maybe_server) |server| testing.allocator.free(server);
+
+    try testing.expect(maybe_server != null);
+    try testing.expectEqualStrings("http://localhost:3333", maybe_server.?);
+}

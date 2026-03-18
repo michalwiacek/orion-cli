@@ -10,7 +10,7 @@ zig build
 zig test src/openapi_loader_integration_test.zig
 ```
 
-3. Update [CHANGELOG.md](/Users/michal/code/apicli-skeleton/CHANGELOG.md):
+3. Update [CHANGELOG.md](./CHANGELOG.md):
    - move relevant entries from `Unreleased` into the new version section.
 4. Confirm README examples still match current CLI behavior.
 5. Confirm no local secrets or local config files are tracked.

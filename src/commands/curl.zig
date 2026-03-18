@@ -85,6 +85,7 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
         try renderSingleLine(allocator, tokens.items);
     defer allocator.free(rendered);
 
+    std.debug.print("[ok] Generated ready-to-run curl command\n", .{});
     std.debug.print("{s}\n", .{rendered});
 }
 
@@ -240,6 +241,16 @@ fn resolveOperationTarget(
     const spec_path = try loader.resolveSpecPath(allocator);
     defer allocator.free(spec_path);
 
+    var discovered_base_url: ?[]u8 = null;
+    defer if (discovered_base_url) |url| allocator.free(url);
+
+    const effective_base_url: ?[]const u8 = if (base_url) |configured|
+        configured
+    else blk: {
+        discovered_base_url = try loader.loadDefaultServerUrlFromFile(allocator, spec_path);
+        break :blk discovered_base_url;
+    };
+
     var operations = try loader.loadOperationsFromFile(allocator, spec_path);
     defer operations.deinit(allocator);
 
@@ -250,7 +261,7 @@ fn resolveOperationTarget(
         defer allocator.free(path);
 
         const method = try parseMethod(op.method);
-        const url = try resolveUrl(allocator, path, base_url, parsed.query_params);
+        const url = try resolveUrl(allocator, path, effective_base_url, parsed.query_params);
 
         return .{
             .method = method,
@@ -454,7 +465,7 @@ fn renderPretty(allocator: std.mem.Allocator, tokens: []const []u8) ![]u8 {
 fn printCurlError(err: anyerror) void {
     switch (err) {
         error.MissingBaseUrl => std.debug.print(
-            "Relative path or operation-id curl requires configured base_url. Use `orion config`.\n",
+            "Relative path or operation-id curl requires base_url (config or OpenAPI servers[0].url). Use `orion config`.\n",
             .{},
         ),
         error.OperationNotFound => std.debug.print("Operation not found in current OpenAPI spec.\n", .{}),

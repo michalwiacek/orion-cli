@@ -29,6 +29,10 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
     defer loaded_cfg.deinit(allocator);
 
     const resolved_target = resolveTarget(allocator, target, loaded_cfg.config.base_url, parsed) catch |err| {
+        if (err == error.MissingRequiredRequestBody and isOperationId(target)) {
+            printMissingRequiredBodyHelp(target);
+            return;
+        }
         printCallError(err);
         return;
     };
@@ -178,17 +182,33 @@ fn resolveOperationTarget(
     const spec_path = try loader.resolveSpecPath(allocator);
     defer allocator.free(spec_path);
 
+    var discovered_base_url: ?[]u8 = null;
+    defer if (discovered_base_url) |url| allocator.free(url);
+
+    const effective_base_url: ?[]const u8 = if (base_url) |configured|
+        configured
+    else blk: {
+        discovered_base_url = try loader.loadDefaultServerUrlFromFile(allocator, spec_path);
+        break :blk discovered_base_url;
+    };
+
     var operations = try loader.loadOperationsFromFile(allocator, spec_path);
     defer operations.deinit(allocator);
 
     for (operations.items) |op| {
         if (!std.mem.eql(u8, op.id, operation_id)) continue;
 
+        if (parsed.body == null) {
+            var details = (try loader.loadOperationDetailsFromFile(allocator, spec_path, operation_id)) orelse return error.OperationNotFound;
+            defer details.deinit(allocator);
+            if (details.request_body_required) return error.MissingRequiredRequestBody;
+        }
+
         const path = try fillPathTemplate(allocator, op.path, parsed.path_params);
         defer allocator.free(path);
 
         const method = try parseMethod(op.method);
-        const url = try resolveUrl(allocator, path, base_url, parsed.query_params);
+        const url = try resolveUrl(allocator, path, effective_base_url, parsed.query_params);
 
         return .{
             .method = method,
@@ -345,10 +365,19 @@ fn readFile(allocator: std.mem.Allocator, path: []const u8) ![]u8 {
     return file.readToEndAlloc(allocator, 8 * 1024 * 1024);
 }
 
+fn printMissingRequiredBodyHelp(operation_id: []const u8) void {
+    std.debug.print(
+        \\Operation {s} requires a request body.
+        \\Try:
+        \\  orion call {s} --body '{{"example":"value"}}'
+        \\
+    , .{ operation_id, operation_id });
+}
+
 fn printCallError(err: anyerror) void {
     switch (err) {
         error.MissingBaseUrl => std.debug.print(
-            "Relative path or operation-id call requires configured base_url. Use `orion config`.\n",
+            "Relative path or operation-id call requires base_url (config or OpenAPI servers[0].url). Use `orion config`.\n",
             .{},
         ),
         error.OperationNotFound => std.debug.print("Operation not found in current OpenAPI spec.\n", .{}),

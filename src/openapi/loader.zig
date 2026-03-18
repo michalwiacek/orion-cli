@@ -7,9 +7,11 @@ pub const OperationDetails = struct {
     method: []u8,
     path: []u8,
     summary: ?[]u8 = null,
+    description: ?[]u8 = null,
     request_body_required: bool = false,
     request_body_content_types: [][]u8,
     request_body_schemas: [][]u8,
+    request_body_fields: [][]u8,
     parameters: [][]u8,
     responses: [][]u8,
 
@@ -18,8 +20,10 @@ pub const OperationDetails = struct {
         allocator.free(self.method);
         allocator.free(self.path);
         if (self.summary) |s| allocator.free(s);
+        if (self.description) |d| allocator.free(d);
         freeStringSlice(allocator, self.request_body_content_types);
         freeStringSlice(allocator, self.request_body_schemas);
+        freeStringSlice(allocator, self.request_body_fields);
         freeStringSlice(allocator, self.parameters);
         freeStringSlice(allocator, self.responses);
         self.* = undefined;
@@ -86,6 +90,26 @@ pub fn loadOperationsFromFile(
     return .{ .items = try items.toOwnedSlice(allocator) };
 }
 
+pub fn loadDefaultServerUrlFromFile(
+    allocator: std.mem.Allocator,
+    spec_path: []const u8,
+) !?[]u8 {
+    var doc = try parseOpenApiDocument(allocator, spec_path);
+    defer doc.deinit();
+
+    const root_obj = asObject(doc.parsed.value) orelse return null;
+    const servers_val = root_obj.get("servers") orelse return null;
+    const servers_arr = asArray(servers_val) orelse return null;
+    if (servers_arr.items.len == 0) return null;
+
+    const first = asObject(servers_arr.items[0]) orelse return null;
+    const url = getStringField(first, "url") orelse return null;
+    if (url.len == 0) return null;
+
+    const owned = try allocator.dupe(u8, url);
+    return owned;
+}
+
 pub fn loadOperationDetailsFromFile(
     allocator: std.mem.Allocator,
     spec_path: []const u8,
@@ -123,6 +147,7 @@ pub fn loadOperationDetailsFromFile(
         .path = try allocator.dupe(u8, wanted_path),
         .request_body_content_types = &.{},
         .request_body_schemas = &.{},
+        .request_body_fields = &.{},
         .parameters = &.{},
         .responses = &.{},
     };
@@ -130,6 +155,9 @@ pub fn loadOperationDetailsFromFile(
 
     if (getStringField(op_obj, "summary")) |summary| {
         details.summary = try allocator.dupe(u8, summary);
+    }
+    if (getStringField(op_obj, "description")) |description| {
+        details.description = try allocator.dupe(u8, description);
     }
 
     var parameters: std.ArrayList([]u8) = .{};
@@ -140,6 +168,9 @@ pub fn loadOperationDetailsFromFile(
 
     var rb_schemas: std.ArrayList([]u8) = .{};
     defer rb_schemas.deinit(allocator);
+
+    var rb_fields: std.ArrayList([]u8) = .{};
+    defer rb_fields.deinit(allocator);
 
     var responses: std.ArrayList([]u8) = .{};
     defer responses.deinit(allocator);
@@ -175,6 +206,13 @@ pub fn loadOperationDetailsFromFile(
                             );
                             defer allocator.free(summary);
                             try rb_schemas.append(allocator, try allocator.dupe(u8, summary));
+                            try appendSchemaFieldLines(
+                                allocator,
+                                rb_resolved.root,
+                                rb_resolved.spec_path,
+                                schema_val,
+                                &rb_fields,
+                            );
                         }
                     }
                 }
@@ -236,6 +274,7 @@ pub fn loadOperationDetailsFromFile(
     details.parameters = try parameters.toOwnedSlice(allocator);
     details.request_body_content_types = try rb_content_types.toOwnedSlice(allocator);
     details.request_body_schemas = try rb_schemas.toOwnedSlice(allocator);
+    details.request_body_fields = try rb_fields.toOwnedSlice(allocator);
     details.responses = try responses.toOwnedSlice(allocator);
 
     return details;
@@ -566,6 +605,110 @@ fn summarizeSchema(
     if (parts.items.len == 0) return allocator.dupe(u8, "unknown");
 
     return joinParts(allocator, parts.items);
+}
+
+fn appendSchemaFieldLines(
+    allocator: std.mem.Allocator,
+    root: std.json.Value,
+    spec_path: []const u8,
+    raw_schema: std.json.Value,
+    out: *std.ArrayList([]u8),
+) anyerror!void {
+    var resolved = try resolveRefsAny(allocator, root, spec_path, raw_schema);
+    defer resolved.deinit();
+    try appendSchemaFieldLinesResolved(allocator, resolved.root, resolved.spec_path, resolved.value, out);
+}
+
+fn appendSchemaFieldLinesResolved(
+    allocator: std.mem.Allocator,
+    root: std.json.Value,
+    spec_path: []const u8,
+    schema_val: std.json.Value,
+    out: *std.ArrayList([]u8),
+) anyerror!void {
+    const obj = asObject(schema_val) orelse return;
+
+    if (obj.get("properties")) |props_val| {
+        if (asObject(props_val)) |props_obj| {
+            var props_it = props_obj.iterator();
+            while (props_it.next()) |entry| {
+                const name = entry.key_ptr.*;
+                const required = isRequiredProperty(obj, name);
+                const type_name = try inferSchemaTypeName(allocator, root, spec_path, entry.value_ptr.*);
+                defer allocator.free(type_name);
+
+                const line = if (required)
+                    try std.fmt.allocPrint(allocator, "{s}: {s} (required)", .{ name, type_name })
+                else
+                    try std.fmt.allocPrint(allocator, "{s}: {s}", .{ name, type_name });
+
+                if (!containsString(out.items, line)) {
+                    try out.append(allocator, line);
+                } else {
+                    allocator.free(line);
+                }
+            }
+        }
+    }
+
+    const composed_keys = [_][]const u8{ "allOf", "anyOf", "oneOf" };
+    for (composed_keys) |key| {
+        const composed = obj.get(key) orelse continue;
+        const arr = asArray(composed) orelse continue;
+        for (arr.items) |part| {
+            try appendSchemaFieldLines(allocator, root, spec_path, part, out);
+        }
+    }
+}
+
+fn inferSchemaTypeName(
+    allocator: std.mem.Allocator,
+    root: std.json.Value,
+    spec_path: []const u8,
+    raw_schema: std.json.Value,
+) anyerror![]u8 {
+    if (extractRefName(raw_schema)) |ref_name| {
+        return std.fmt.allocPrint(allocator, "$ref:{s}", .{ref_name});
+    }
+
+    var resolved = try resolveRefsAny(allocator, root, spec_path, raw_schema);
+    defer resolved.deinit();
+    const obj = asObject(resolved.value) orelse return allocator.dupe(u8, "unknown");
+
+    if (getStringField(obj, "type")) |t| {
+        if (std.mem.eql(u8, t, "array")) {
+            if (obj.get("items")) |items| {
+                const item_type = try inferSchemaTypeName(allocator, resolved.root, resolved.spec_path, items);
+                defer allocator.free(item_type);
+                return std.fmt.allocPrint(allocator, "array<{s}>", .{item_type});
+            }
+        }
+        return allocator.dupe(u8, t);
+    }
+
+    if (obj.get("enum") != null) return allocator.dupe(u8, "enum");
+    if (obj.get("oneOf") != null) return allocator.dupe(u8, "oneOf");
+    if (obj.get("anyOf") != null) return allocator.dupe(u8, "anyOf");
+    if (obj.get("allOf") != null) return allocator.dupe(u8, "allOf");
+    if (obj.get("properties") != null) return allocator.dupe(u8, "object");
+    return allocator.dupe(u8, "unknown");
+}
+
+fn isRequiredProperty(schema_obj: std.json.ObjectMap, prop_name: []const u8) bool {
+    const required_val = schema_obj.get("required") orelse return false;
+    const arr = asArray(required_val) orelse return false;
+    for (arr.items) |v| {
+        const s = asString(v) orelse continue;
+        if (std.mem.eql(u8, s, prop_name)) return true;
+    }
+    return false;
+}
+
+fn containsString(values: []const []u8, wanted: []const u8) bool {
+    for (values) |v| {
+        if (std.mem.eql(u8, v, wanted)) return true;
+    }
+    return false;
 }
 
 fn appendComposedSchemas(

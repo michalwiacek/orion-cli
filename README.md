@@ -1,6 +1,6 @@
 # Orion
 
-Minimal skeleton for an OpenAPI‑aware CLI written in Zig.
+OpenAPI-first CLI for humans and AI agents.
 
 ## Badges
 
@@ -9,7 +9,7 @@ Minimal skeleton for an OpenAPI‑aware CLI written in Zig.
 
 ## Status
 
-Early-stage project. APIs and CLI flags may evolve.
+Actively developed. CLI flags and output format may still evolve as we harden workflows.
 
 ## Requirements
 
@@ -99,10 +99,11 @@ orion call /users
 You can also call directly by OpenAPI operation id:
 
 ```bash
+# examples below are illustrative and spec-agnostic
 orion call get:/health
-orion call get:/api/v1/offers/{id} --param id=123 --query limit=10
-orion call post:/api/v1/auth/register --body '{"email":"a@b.com","password":"x"}'
-orion curl get:/api/v1/offers/{id} --param id=123 --query limit=10
+orion call get:/items/{id} --param id=123 --query limit=10
+orion call post:/auth/register --body '{"email":"a@b.com","password":"x"}'
+orion curl get:/items/{id} --param id=123 --query limit=10
 orion curl get:/health -k
 orion curl get:/health --pretty
 orion curl get:/health -- --http1.1 --connect-timeout 5
@@ -134,7 +135,7 @@ Example:
 orion describe get:/health
 ```
 
-`describe` now shows: summary, parameters, request body (required + content types), and responses.
+`describe` now shows: summary, headers, parameters, request body fields, request body schema summary, and responses.
 It also resolves common `$ref` values from `components` (parameters, responses, request body schemas).
 Response lines include content type and resolved response schema refs when available.
 Supported ref forms include:
