@@ -1,95 +1,162 @@
 # Orion
 
-OpenAPI-first CLI for humans and AI agents.
+Stop writing curl.
 
-## Badges
-
-![CI](https://github.com/michalwiacek/orion-cli/actions/workflows/ci.yml/badge.svg)
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-
-## Status
-
-Actively developed. CLI flags and output format may still evolve as we harden workflows.
-
-## Requirements
-
-- Zig 0.15.x
-- Ruby (used for YAML -> JSON conversion in OpenAPI parsing)
-
-## Build and test
+Use your API like this instead:
 
 ```bash
-zig build
-zig test src/openapi_loader_integration_test.zig
+orion inspect openapi.yaml
+orion list
+orion call get:/users/1
 ```
 
-## Release
+Orion is a task-first CLI that turns your OpenAPI spec into a usable runtime.
 
-See:
+![Orion CLI demo](./demo.gif)
 
-- [CHANGELOG.md](./CHANGELOG.md)
-- [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md)
+---
 
-## Install locally
+## Why?
+
+Working with APIs usually looks like this:
+
+```bash
+curl -X GET https://api.example.com/users/1 \
+  -H "Authorization: Bearer ..." \
+  -H "Content-Type: application/json"
+```
+
+You need to:
+- remember endpoints
+- construct requests manually
+- guess payloads
+- jump between docs and terminal
+
+---
+
+## Orion
+
+```bash
+orion inspect openapi.yaml
+orion list
+orion search users
+orion call get:/users/{id} --param id=1
+```
+
+- operations instead of endpoints  
+- OpenAPI as source of truth  
+- no context switching  
+- works locally  
+- usable by humans and AI agents  
+
+---
+
+## Quickstart
+
+```bash
+git clone https://github.com/michalwiacek/orion-cli
+cd orion-cli
+
+./setup.sh
+
+orion inspect openapi.yaml
+orion list
+```
+
+Need full command and flag reference? See [docs/cli-reference.md](./docs/cli-reference.md).
+
+---
+
+## Core workflow
+
+```bash
+orion inspect <spec>
+orion list
+orion describe <operation-id>
+orion call <operation-id>
+```
+
+---
+
+## Examples
+
+```bash
+orion call get:/items/{id} --param id=123
+```
+
+```bash
+orion call post:/auth/login \
+  --body '{"email":"a@b.com","password":"x"}'
+```
+
+```bash
+orion search users
+```
+
+```bash
+orion describe get:/health
+```
+
+---
+
+## Features
+
+- OpenAPI parsing (local + remote)
+- operation-first CLI
+- request generation from schema
+- history + rerun
+- profiles and environments
+- fuzzy search (`orion search`)
+- curl export (`orion curl`)
+- offline mode (cache)
+- AI-native hooks (`--for-agent`, `plan`, `explain`)
+- HTTP shortcuts (`orion get /health`, etc.)
+
+---
+
+## Philosophy
+
+Orion is not a wrapper around curl.
+
+It operates on a different level:
+
+- curl → HTTP layer  
+- Orion → operation layer  
+
+Instead of thinking in endpoints and payloads,
+you work with actions defined in OpenAPI.
+
+---
+
+## Install
+
+### Option 1 (recommended)
 
 ```bash
 ./setup.sh
 ```
 
-Manual alternative:
+### Option 2 (manual)
 
 ```bash
 zig build install --prefix ~/.local
 ```
 
-## Goals
-- Operation‑first architecture
-- OpenAPI as source of truth
-- CLI usable by humans and AI agents
-- Local‑first (works without SaaS/control plane)
+---
 
-## MVP flow
+## Requirements
 
-orion inspect <openapi-url-or-file>
-orion list
-orion describe <operation-id>
-orion call <operation-id|url-or-path>
-orion curl <operation-id|url-or-path>
-orion config
-orion doctor
-orion history
-orion rerun <history-id>
-orion profile list
-orion use <profile>
-orion current
-orion search <query>
-orion example <operation-id>
-orion explain <operation-id>
-orion cache refresh
-orion plan "<goal>"
-orion plugin list
+- Zig 0.15.x  
+- Ruby (used for YAML → JSON conversion in OpenAPI parsing)  
 
-## Structure
+---
 
-src/
-  main.zig
-  cli/
-  commands/
-  core/
-  providers/
-  openapi/
-  engine/
-  http/
-  auth/
-  config/
-  render/
-
-## Config
+## Configuration
 
 Config is loaded from two layers:
 
-1. Global: `~/.config/orion/config.json` (or `$XDG_CONFIG_HOME/orion/config.json`)
-2. Project: nearest `.orion/config.json` from current directory upward
+1. Global: `~/.config/orion/config.json`  
+2. Project: nearest `.orion/config.json`  
 
 Project config overrides global config.
 
@@ -102,60 +169,85 @@ Example:
 }
 ```
 
-With `base_url` configured, you can call relative paths:
+With `base_url` configured:
 
 ```bash
 orion call /users
 ```
 
-You can also call directly by OpenAPI operation id:
+---
+
+## Calling APIs
+
+You can call:
+
+### by operation id
 
 ```bash
-# examples below are illustrative and spec-agnostic
 orion call get:/health
-orion call get:/items/{id} --param id=123 --query limit=10
-orion call post:/auth/register --body '{"email":"a@b.com","password":"x"}'
-orion curl get:/items/{id} --param id=123 --query limit=10
-orion curl get:/health -k
-orion curl get:/health --pretty
-orion curl get:/health -- --http1.1 --connect-timeout 5
 ```
 
-Supported flags for `call`:
-- `--param key=value` for `{path}` placeholders in operation paths
-- `--query key=value` to append query params
-- `--body @file.json|json` for request body (JSON)
-- `--method METHOD` for direct URL/path mode (default `GET`)
-- `--dry-run` to render the resolved request without sending it
-- `--explain` to print request resolution details (target, URL, body source)
-- `--use NAME` / `--save NAME` for reusable request presets in `.orion/presets/`
-- `--no-auto-body` to disable schema-based automatic body generation
-- `--no-body-cache` to disable reading/writing remembered request bodies
-- `--show-body-source` to print where body came from (explicit/cache/generated)
-- `--output text|json` for script-friendly output
-- `--example` to generate and use request body example from schema
+### with params
 
-`orion curl` supports the same flags and prints an equivalent `curl` command.
-It also passes native curl flags (for example `-k`, `--insecure`) and supports explicit `--curl-flag FLAG`.
-Use `--pretty` for multiline output, `--output text|json` for machine-readable output, and `--` to pass remaining args directly to curl.
+```bash
+orion call get:/items/{id} --param id=123 --query limit=10
+```
 
-Additional workflow commands:
-- `orion doctor [--output text|json]` validates config and OpenAPI loading health.
-- `orion history [--limit N] [--output text|json]` shows recent successful calls.
-- `orion rerun <history-id> [--dry-run] [--output text|json]` replays a historical request.
-- `orion search <query>` finds operations with fuzzy scoring.
-- `orion example <operation-id> [--mode minimal|full] [--format json|yaml]` generates payload examples.
-- `orion explain <operation-id>` gives workflow-oriented explanation.
-- `orion cache refresh` + `orion list --offline` enables offline browsing of operation cache.
-- `orion profile add/list/remove`, `orion use`, `orion current` provide context switching.
-- HTTP shortcuts are available: `orion get /health`, `orion post /auth/login`, etc.
-- AI-native hooks: `orion describe <operation-id> --for-agent`, `orion plan "<goal>"`.
+### with body
 
-## OpenAPI parsing (MVP)
+```bash
+orion call post:/auth/register \
+  --body '{"email":"a@b.com","password":"x"}'
+```
 
-`orion list` reads operations from configured `openapi_spec` (or `openapi.remote.yaml` by default).
+---
 
-`orion describe` expects an operation id in format:
+## curl export
+
+```bash
+orion curl get:/items/{id} --param id=123
+```
+
+Supports:
+
+```bash
+--pretty
+--output text|json
+-- --http1.1 --connect-timeout 5
+```
+
+---
+
+## Flags (core)
+
+- `--param key=value` → path params  
+- `--query key=value` → query params  
+- `--body json|@file.json` → request body  
+- `--dry-run` → show request without sending  
+- `--output text|json` → machine-friendly output  
+
+---
+
+## Workflow commands
+
+- `orion doctor` → validate config  
+- `orion history` → list calls  
+- `orion rerun <id>` → replay  
+- `orion search <query>` → find operations  
+- `orion example <operation-id>` → generate payload  
+- `orion explain <operation-id>` → explain flow  
+- `orion cache refresh` → refresh cache  
+- `orion profile add/list/remove` → manage profiles  
+- `orion use <profile>` → switch context  
+- `orion current` → show active profile  
+
+---
+
+## OpenAPI parsing
+
+`orion list` reads operations from configured spec.
+
+`orion describe` expects:
 
 ```bash
 <method>:<path>
@@ -167,11 +259,39 @@ Example:
 orion describe get:/health
 ```
 
-`describe` now shows: summary, headers, parameters, request body fields, request body schema summary, and responses.
-It also resolves common `$ref` values from `components` (parameters, responses, request body schemas).
-Response lines include content type and resolved response schema refs when available.
-Supported ref forms include:
-- local refs: `#/components/...`
-- external file refs: `./common.yaml#/components/...`
-- HTTP refs: `https://...#/components/...`
-- escaped JSON Pointer tokens (`~0`, `~1`)
+Supports:
+- local refs (`#/components/...`)
+- external file refs (`./common.yaml#...`)
+- HTTP refs (`https://...`)
+- JSON Pointer escapes (`~0`, `~1`)
+
+---
+
+## Status
+
+Actively developed.
+
+CLI flags and output format may still evolve.
+
+---
+
+## Vision
+
+Orion is a foundation for:
+
+- CLI-first API workflows  
+- AI-assisted system interaction  
+- local-first tooling  
+- optional control plane in the future  
+
+---
+
+## Contributing
+
+PRs welcome.
+
+---
+
+## License
+
+MIT

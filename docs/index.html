@@ -535,15 +535,14 @@
           <h1>Call APIs by operation ID, not by guesswork.</h1>
 
           <p class="lead">
-            Orion CLI helps humans and AI agents discover endpoints, inspect request and
-            response shapes, execute operations, and generate ready-to-run curl commands
-            directly from OpenAPI specs.
+            Start from intent, not from endpoint trivia. Search what you want to do, generate
+            a valid payload from OpenAPI, and execute the call in seconds with reusable presets.
           </p>
 
           <ul class="subpoints" aria-label="Highlights">
-            <li>Discover endpoints fast</li>
-            <li>Inspect schemas without digging through YAML</li>
-            <li>Generate curl instantly</li>
+            <li>Semantic API discovery with fuzzy search</li>
+            <li>Automatic examples and request-body scaffolding</li>
+            <li>Fast execution with dry-run, curl preview, and presets</li>
           </ul>
 
           <div class="cta">
@@ -564,27 +563,20 @@
               <div class="terminal-dots" aria-hidden="true">
                 <span></span><span></span><span></span>
               </div>
-              <div class="terminal-title">terminal — orion describe post:/auth/login</div>
+              <div class="terminal-title">terminal — outcome-first flow</div>
             </div>
-            <pre><code><span class="prompt">$</span> orion describe post:/auth/login
+            <pre><code><span class="prompt">$</span> orion search offers
+<span class="green">30</span>  get:/offers
+<span class="green">28</span>  post:/offers/create
 
-<span class="blue">Operation</span>  post:/auth/login
-<span class="blue">Summary</span>    Authenticate a user and return an access token
+<span class="prompt">$</span> orion example post:/offers/create --mode minimal
+{
+  "title": "string",
+  "price": 0
+}
 
-<span class="blue">Headers</span>
-  Content-Type: application/json
-
-<span class="blue">Request body</span>
-  email: string <span class="muted">(required)</span>
-  password: string <span class="muted">(required)</span>
-
-<span class="blue">Responses</span>
-  200  AuthTokenResponse
-  401  Unauthorized
-  422  ValidationError
-
-<span class="prompt">$</span> orion curl post:/auth/login -k --pretty
-<span class="green">✓</span> Generated ready-to-run curl command</code></pre>
+<span class="prompt">$</span> orion call post:/offers/create --example --dry-run
+<span class="green">✓</span> Request preview ready in one command</code></pre>
           </div>
         </div>
       </section>
@@ -667,22 +659,22 @@
 
         <div class="grid-2">
           <article class="card">
-            <h3>Explore the API</h3>
-            <pre class="code"><code>orion list
-orion describe get:/health
-orion describe post:/auth/login</code></pre>
+            <h3>Find intent fast</h3>
+            <pre class="code"><code>orion search offers
+orion search login
+orion describe post:/offers/create</code></pre>
             <p class="tiny-note">
-              Start by discovering available operations and inspecting what each one expects.
+              Start from what you want to do, then jump to the exact operation.
             </p>
           </article>
 
           <article class="card">
-            <h3>Call or export the request</h3>
-            <pre class="code"><code>orion call get:/health
-orion call post:/auth/login
-orion curl post:/auth/login -k --pretty</code></pre>
+            <h3>Execute in seconds</h3>
+            <pre class="code"><code>orion example post:/offers/create
+orion call post:/offers/create --example --dry-run
+orion call post:/offers/create</code></pre>
             <p class="tiny-note">
-              Execute operations directly or generate curl commands you can share, tweak, or automate.
+              Generate payloads and execute with preview-first safety.
             </p>
           </article>
         </div>
