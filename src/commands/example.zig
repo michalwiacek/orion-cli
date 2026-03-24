@@ -52,10 +52,19 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     const operation_id = op_id orelse return error.MissingOperationId;
 
-    const spec_path = try loader.resolveSpecPath(allocator);
+    const spec_path = loader.resolveSpecPath(allocator) catch {
+        std.debug.print(
+            "No OpenAPI spec configured. Set `openapi_spec` in config or add `openapi.remote.yaml` in project root.\n",
+            .{},
+        );
+        return;
+    };
     defer allocator.free(spec_path);
 
-    var details = (try loader.loadOperationDetailsFromFile(allocator, spec_path, operation_id)) orelse {
+    var details = (loader.loadOperationDetailsFromFile(allocator, spec_path, operation_id) catch |err| {
+        printExampleError(spec_path, err);
+        return;
+    }) orelse {
         std.debug.print("Operation not found: {s}\n", .{operation_id});
         return;
     };
@@ -164,5 +173,19 @@ fn printYamlFromFlatJson(allocator: std.mem.Allocator, json_obj: []const u8) !vo
             .array => |_| std.debug.print("[]\n", .{}),
             else => std.debug.print("{{}}\n", .{}),
         }
+    }
+}
+
+fn printExampleError(spec_path: []const u8, err: anyerror) void {
+    switch (err) {
+        error.FileNotFound => std.debug.print("OpenAPI spec not found: {s}\n", .{spec_path}),
+        error.AccessDenied => std.debug.print("Cannot read OpenAPI spec (permission denied): {s}\n", .{spec_path}),
+        error.InvalidOpenApiDocument => {
+            std.debug.print("Invalid OpenAPI document: {s}\n", .{spec_path});
+            if (loader.getLastOpenApiErrorDetail()) |detail| {
+                std.debug.print("Details: {s}\n", .{detail});
+            }
+        },
+        else => std.debug.print("Example generation failed while reading spec ({s}): {s}\n", .{ spec_path, @errorName(err) }),
     }
 }

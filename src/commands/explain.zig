@@ -28,10 +28,19 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
 
     const op = operation_id orelse return error.MissingOperationId;
 
-    const spec_path = try loader.resolveSpecPath(allocator);
+    const spec_path = loader.resolveSpecPath(allocator) catch {
+        std.debug.print(
+            "No OpenAPI spec configured. Set `openapi_spec` in config or add `openapi.remote.yaml` in project root.\n",
+            .{},
+        );
+        return;
+    };
     defer allocator.free(spec_path);
 
-    var details = (try loader.loadOperationDetailsFromFile(allocator, spec_path, op)) orelse {
+    var details = (loader.loadOperationDetailsFromFile(allocator, spec_path, op) catch |err| {
+        printExplainError(spec_path, err);
+        return;
+    }) orelse {
         std.debug.print("Operation not found: {s}\n", .{op});
         return;
     };
@@ -89,4 +98,18 @@ fn flowHint(method: []const u8) []const u8 {
     if (std.ascii.eqlIgnoreCase(method, "put") or std.ascii.eqlIgnoreCase(method, "patch")) return "Update flow. Consider idempotency and partial updates.";
     if (std.ascii.eqlIgnoreCase(method, "delete")) return "Delete flow. Confirm target and side effects.";
     return "Review endpoint contract before execution.";
+}
+
+fn printExplainError(spec_path: []const u8, err: anyerror) void {
+    switch (err) {
+        error.FileNotFound => std.debug.print("OpenAPI spec not found: {s}\n", .{spec_path}),
+        error.AccessDenied => std.debug.print("Cannot read OpenAPI spec (permission denied): {s}\n", .{spec_path}),
+        error.InvalidOpenApiDocument => {
+            std.debug.print("Invalid OpenAPI document: {s}\n", .{spec_path});
+            if (loader.getLastOpenApiErrorDetail()) |detail| {
+                std.debug.print("Details: {s}\n", .{detail});
+            }
+        },
+        else => std.debug.print("Explain failed while reading spec ({s}): {s}\n", .{ spec_path, @errorName(err) }),
+    }
 }

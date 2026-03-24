@@ -1022,7 +1022,12 @@ fn printCallError(err: anyerror) void {
         error.OperationNotFound => std.debug.print("Operation not found in current OpenAPI spec.\n", .{}),
         error.FileNotFound => std.debug.print("OpenAPI spec file not found. Check `openapi_spec` in config.\n", .{}),
         error.AccessDenied => std.debug.print("Cannot read required file (permission denied).\n", .{}),
-        error.InvalidOpenApiDocument => std.debug.print("Invalid OpenAPI document. Check that the spec is valid JSON or YAML.\n", .{}),
+        error.InvalidOpenApiDocument => {
+            std.debug.print("Invalid OpenAPI document. Check that the spec is valid JSON or YAML.\n", .{});
+            if (loader.getLastOpenApiErrorDetail()) |detail| {
+                std.debug.print("Details: {s}\n", .{detail});
+            }
+        },
         error.MissingPathParam => std.debug.print("Missing required path parameter. Pass it with --param key=value.\n", .{}),
         error.InvalidKeyValue => std.debug.print("Invalid key=value format. Example: --query limit=10\n", .{}),
         error.MissingPresetName => std.debug.print("Missing preset name. Use --use <name> or --save <name>.\n", .{}),

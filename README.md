@@ -147,7 +147,6 @@ zig build install --prefix ~/.local
 ## Requirements
 
 - Zig 0.15.x  
-- Ruby (used for YAML → JSON conversion in OpenAPI parsing)  
 
 ---
 

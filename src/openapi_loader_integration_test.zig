@@ -111,7 +111,7 @@ test "describe resolves refs and composed schemas" {
     try testing.expect(std.mem.indexOf(u8, details.responses[0], "$ref:Result") != null);
 }
 
-test "load YAML OpenAPI via converter" {
+test "load YAML OpenAPI via native parser" {
     var tmp = testing.tmpDir(.{});
     defer tmp.cleanup();
 

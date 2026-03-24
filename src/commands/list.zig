@@ -113,7 +113,12 @@ fn printListError(spec_path: []const u8, err: anyerror) void {
     switch (err) {
         error.FileNotFound => std.debug.print("OpenAPI spec not found: {s}\n", .{spec_path}),
         error.AccessDenied => std.debug.print("Cannot read OpenAPI spec (permission denied): {s}\n", .{spec_path}),
-        error.InvalidOpenApiDocument => std.debug.print("Invalid OpenAPI document: {s}\n", .{spec_path}),
+        error.InvalidOpenApiDocument => {
+            std.debug.print("Invalid OpenAPI document: {s}\n", .{spec_path});
+            if (loader.getLastOpenApiErrorDetail()) |detail| {
+                std.debug.print("Details: {s}\n", .{detail});
+            }
+        },
         else => std.debug.print("Failed to load OpenAPI spec ({s}): {s}\n", .{ spec_path, @errorName(err) }),
     }
 }

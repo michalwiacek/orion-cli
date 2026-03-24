@@ -1,6 +1,29 @@
 const std = @import("std");
 const app_config = @import("../config/config.zig");
 const operation = @import("../core/operation.zig");
+const yaml_native = @import("yaml_native.zig");
+
+var last_openapi_error_detail_buf: [512]u8 = undefined;
+var last_openapi_error_detail_len: usize = 0;
+
+pub fn clearLastOpenApiErrorDetail() void {
+    last_openapi_error_detail_len = 0;
+}
+
+pub fn getLastOpenApiErrorDetail() ?[]const u8 {
+    if (last_openapi_error_detail_len == 0) return null;
+    return last_openapi_error_detail_buf[0..last_openapi_error_detail_len];
+}
+
+fn setLastOpenApiErrorDetail(comptime fmt: []const u8, args: anytype) void {
+    const rendered = std.fmt.bufPrint(&last_openapi_error_detail_buf, fmt, args) catch {
+        const fallback = "OpenAPI parse error";
+        @memcpy(last_openapi_error_detail_buf[0..fallback.len], fallback);
+        last_openapi_error_detail_len = fallback.len;
+        return;
+    };
+    last_openapi_error_detail_len = rendered.len;
+}
 
 pub const OperationDetails = struct {
     id: []u8,
@@ -90,6 +113,7 @@ pub fn loadOperationsFromFile(
     allocator: std.mem.Allocator,
     spec_path: []const u8,
 ) !operation.OperationList {
+    clearLastOpenApiErrorDetail();
     var doc = try parseOpenApiDocument(allocator, spec_path);
     defer doc.deinit();
 
@@ -132,6 +156,7 @@ pub fn loadDefaultServerUrlFromFile(
     allocator: std.mem.Allocator,
     spec_path: []const u8,
 ) !?[]u8 {
+    clearLastOpenApiErrorDetail();
     var doc = try parseOpenApiDocument(allocator, spec_path);
     defer doc.deinit();
 
@@ -153,6 +178,7 @@ pub fn loadOperationDetailsFromFile(
     spec_path: []const u8,
     operation_id: []const u8,
 ) !?OperationDetails {
+    clearLastOpenApiErrorDetail();
     const sep = std.mem.indexOfScalar(u8, operation_id, ':') orelse return error.InvalidOperationId;
     const wanted_method = operation_id[0..sep];
     const wanted_path = operation_id[sep + 1 ..];
@@ -347,21 +373,36 @@ fn parseOpenApiDocument(allocator: std.mem.Allocator, spec_path: []const u8) !Pa
     const bytes = try readFile(allocator, spec_path);
     defer allocator.free(bytes);
 
-    const first = firstNonWhitespace(bytes) orelse return error.InvalidOpenApiDocument;
+    const first = firstNonWhitespace(bytes) orelse {
+        setLastOpenApiErrorDetail("OpenAPI document is empty: {s}", .{normalized_path});
+        return error.InvalidOpenApiDocument;
+    };
     if (first == '{' or first == '[') {
         return .{
             .allocator = allocator,
-            .parsed = try std.json.parseFromSlice(std.json.Value, allocator, bytes, .{}),
+            .parsed = try parseJsonDocument(allocator, normalized_path, bytes),
             .source_path = normalized_path,
         };
     }
 
-    const json_bytes = try yamlToJsonViaRuby(allocator, spec_path);
+    var diagnostics: yaml_native.Diagnostics = .{};
+    const json_bytes = yaml_native.yamlToJsonWithDiagnostics(allocator, bytes, &diagnostics) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.YamlParseFailed => {
+            if (diagnostics.line) |line| {
+                setLastOpenApiErrorDetail("YAML parse error in {s} at line {d}", .{ normalized_path, line });
+            } else {
+                setLastOpenApiErrorDetail("YAML parse error in {s}", .{normalized_path});
+            }
+            return error.InvalidOpenApiDocument;
+        },
+        else => return err,
+    };
     defer allocator.free(json_bytes);
 
     return .{
         .allocator = allocator,
-        .parsed = try std.json.parseFromSlice(std.json.Value, allocator, json_bytes, .{}),
+        .parsed = try parseJsonDocument(allocator, normalized_path, json_bytes),
         .source_path = normalized_path,
     };
 }
@@ -373,22 +414,51 @@ fn parseOpenApiDocumentFromUrl(allocator: std.mem.Allocator, url: []const u8) !P
     const bytes = try readUrl(allocator, url);
     defer allocator.free(bytes);
 
-    const first = firstNonWhitespace(bytes) orelse return error.InvalidOpenApiDocument;
+    const first = firstNonWhitespace(bytes) orelse {
+        setLastOpenApiErrorDetail("OpenAPI document is empty: {s}", .{normalized_path});
+        return error.InvalidOpenApiDocument;
+    };
     if (first == '{' or first == '[') {
         return .{
             .allocator = allocator,
-            .parsed = try std.json.parseFromSlice(std.json.Value, allocator, bytes, .{}),
+            .parsed = try parseJsonDocument(allocator, normalized_path, bytes),
             .source_path = normalized_path,
         };
     }
 
-    const json_bytes = try yamlTextToJsonViaRuby(allocator, bytes);
+    var diagnostics: yaml_native.Diagnostics = .{};
+    const json_bytes = yaml_native.yamlToJsonWithDiagnostics(allocator, bytes, &diagnostics) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.YamlParseFailed => {
+            if (diagnostics.line) |line| {
+                setLastOpenApiErrorDetail("YAML parse error in {s} at line {d}", .{ normalized_path, line });
+            } else {
+                setLastOpenApiErrorDetail("YAML parse error in {s}", .{normalized_path});
+            }
+            return error.InvalidOpenApiDocument;
+        },
+        else => return err,
+    };
     defer allocator.free(json_bytes);
 
     return .{
         .allocator = allocator,
-        .parsed = try std.json.parseFromSlice(std.json.Value, allocator, json_bytes, .{}),
+        .parsed = try parseJsonDocument(allocator, normalized_path, json_bytes),
         .source_path = normalized_path,
+    };
+}
+
+fn parseJsonDocument(
+    allocator: std.mem.Allocator,
+    source_path: []const u8,
+    bytes: []const u8,
+) !std.json.Parsed(std.json.Value) {
+    return std.json.parseFromSlice(std.json.Value, allocator, bytes, .{}) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        else => {
+            setLastOpenApiErrorDetail("JSON parse error in {s}: {s}", .{ source_path, @errorName(err) });
+            return error.InvalidOpenApiDocument;
+        },
     };
 }
 
@@ -396,73 +466,6 @@ fn normalizeSpecPath(allocator: std.mem.Allocator, spec_path: []const u8) ![]u8 
     if (isHttpUrl(spec_path)) return allocator.dupe(u8, spec_path);
     if (std.fs.path.isAbsolute(spec_path)) return allocator.dupe(u8, spec_path);
     return std.fs.cwd().realpathAlloc(allocator, spec_path);
-}
-
-fn yamlToJsonViaRuby(allocator: std.mem.Allocator, spec_path: []const u8) ![]u8 {
-    var child = std.process.Child.init(&.{
-        "ruby",
-        "-ryaml",
-        "-rjson",
-        "-e",
-        "obj = YAML.safe_load(File.read(ARGV[0]), aliases: true); puts JSON.generate(obj)",
-        spec_path,
-    }, allocator);
-    child.stdin_behavior = .Ignore;
-    child.stdout_behavior = .Pipe;
-    child.stderr_behavior = .Pipe;
-
-    try child.spawn();
-
-    const stdout_bytes = try child.stdout.?.readToEndAlloc(allocator, 16 * 1024 * 1024);
-    errdefer allocator.free(stdout_bytes);
-
-    const stderr_bytes = try child.stderr.?.readToEndAlloc(allocator, 1024 * 1024);
-    defer allocator.free(stderr_bytes);
-
-    const term = try child.wait();
-    switch (term) {
-        .Exited => |code| {
-            if (code != 0) return error.YamlParseFailed;
-        },
-        else => return error.YamlParseFailed,
-    }
-
-    return stdout_bytes;
-}
-
-fn yamlTextToJsonViaRuby(allocator: std.mem.Allocator, yaml_text: []const u8) ![]u8 {
-    var child = std.process.Child.init(&.{
-        "ruby",
-        "-ryaml",
-        "-rjson",
-        "-e",
-        "obj = YAML.safe_load(STDIN.read, aliases: true); puts JSON.generate(obj)",
-    }, allocator);
-    child.stdin_behavior = .Pipe;
-    child.stdout_behavior = .Pipe;
-    child.stderr_behavior = .Pipe;
-
-    try child.spawn();
-
-    try child.stdin.?.writeAll(yaml_text);
-    child.stdin.?.close();
-    child.stdin = null;
-
-    const stdout_bytes = try child.stdout.?.readToEndAlloc(allocator, 16 * 1024 * 1024);
-    errdefer allocator.free(stdout_bytes);
-
-    const stderr_bytes = try child.stderr.?.readToEndAlloc(allocator, 1024 * 1024);
-    defer allocator.free(stderr_bytes);
-
-    const term = try child.wait();
-    switch (term) {
-        .Exited => |code| {
-            if (code != 0) return error.YamlParseFailed;
-        },
-        else => return error.YamlParseFailed,
-    }
-
-    return stdout_bytes;
 }
 
 fn readUrl(allocator: std.mem.Allocator, url: []const u8) ![]u8 {

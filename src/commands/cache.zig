@@ -17,10 +17,19 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) !void {
 }
 
 fn refresh(allocator: std.mem.Allocator) !void {
-    const spec_path = try loader.resolveSpecPath(allocator);
+    const spec_path = loader.resolveSpecPath(allocator) catch {
+        std.debug.print(
+            "No OpenAPI spec configured. Set `openapi_spec` in config or add `openapi.remote.yaml` in project root.\n",
+            .{},
+        );
+        return;
+    };
     defer allocator.free(spec_path);
 
-    var ops = try loader.loadOperationsFromFile(allocator, spec_path);
+    var ops = loader.loadOperationsFromFile(allocator, spec_path) catch |err| {
+        printCacheError(spec_path, err);
+        return;
+    };
     defer ops.deinit(allocator);
 
     const path = try cachePath(allocator, true);
@@ -113,4 +122,18 @@ fn dirExistsAbsolute(path: []const u8) bool {
     var dir = std.fs.openDirAbsolute(path, .{}) catch return false;
     dir.close();
     return true;
+}
+
+fn printCacheError(spec_path: []const u8, err: anyerror) void {
+    switch (err) {
+        error.FileNotFound => std.debug.print("OpenAPI spec not found: {s}\n", .{spec_path}),
+        error.AccessDenied => std.debug.print("Cannot read OpenAPI spec (permission denied): {s}\n", .{spec_path}),
+        error.InvalidOpenApiDocument => {
+            std.debug.print("Invalid OpenAPI document: {s}\n", .{spec_path});
+            if (loader.getLastOpenApiErrorDetail()) |detail| {
+                std.debug.print("Details: {s}\n", .{detail});
+            }
+        },
+        else => std.debug.print("Cache refresh failed while reading spec ({s}): {s}\n", .{ spec_path, @errorName(err) }),
+    }
 }
